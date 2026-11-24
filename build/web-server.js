@@ -218,7 +218,12 @@ function buildPatchedDiscordHTML() {
     // 4. Disable Discord's inline FAST CONNECT script in index.html so it doesn't open an unpatched zlib-stream WebSocket before Vencord loads
     html = html.replace("if (null != window.WebSocket &&", "if (false && null != window.WebSocket &&");
     const buildTs = Date.now();
-    // 5. Inject iOS Safari PWA tags, Vencord bundle, Web Bridge, and Mobile CSS right after <head>
+    let mobileCssContent = "";
+    try {
+        mobileCssContent = (0, fs_1.readFileSync)(path_1.default.join(APP_ROOT, "assets", "dbc-mobile.css"), "utf8");
+    }
+    catch (e) { }
+    // 5. Inject iOS Safari PWA tags, Inlined Mobile CSS, Vencord bundle, Web Bridge, and Mobile CSS right after <head>
     const injection = `<head>
     <!-- iOS Safari PWA & Mobile Viewport -->
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
@@ -229,6 +234,9 @@ function buildPatchedDiscordHTML() {
     <link rel="manifest" href="/manifest.json">
     <link rel="apple-touch-icon" href="/dbc-assets/icon.png">
     <link rel="icon" type="image/png" href="/dbc-assets/icon.png">
+
+    <!-- Synchronous Inlined Native Mobile CSS -->
+    <style id="dbc-mobile-inline">${mobileCssContent}</style>
 
     <!-- Vencord & Mobile Styles -->
     <link rel="stylesheet" href="/vencord-ext/dist/Vencord.css?v=${buildTs}">

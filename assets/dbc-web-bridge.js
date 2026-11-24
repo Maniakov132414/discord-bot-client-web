@@ -376,21 +376,31 @@
 
   function updateMobileMode() {
     if (!isMobileViewport()) {
-      document.body.classList.remove("dbc-mode-nav", "dbc-mode-chat", "dbc-members-open");
+      document.body.classList.remove("dbc-mode-nav", "dbc-mode-chat", "dbc-members-open", "dbc-page-login");
       return;
     }
 
     var path = window.location.pathname;
-    // If on /channels/@me or /channels/:guildId without a specific active channel open, show nav
-    // When a channel is selected (/channels/@me/xxx or /channels/guildId/chanId), default to chat mode
-    // UNLESS the user explicitly tapped the Back button to view channels list
-    if (path === "/channels/@me" || path === "/app" || path === "/") {
+    var hasToken = !!safeGetLocal("token");
+    var hasLoginForm = !!document.querySelector('input[type="password"], [class*="authBox_"], .dbc-fallback-token-box');
+    var isLogin = path === "/login" || (!hasToken && hasLoginForm);
+    document.body.classList.toggle("dbc-page-login", isLogin);
+
+    if (isLogin) {
+      document.body.classList.remove("dbc-mode-nav", "dbc-mode-chat");
+      return;
+    }
+
+    // Navigation logic:
+    // When user is on /channels/@me, show nav (DM list)
+    // When on /channels/:guildId/:channelId, default to chat UNLESS user tapped Back (nav override)
+    if (path === "/channels/@me" || path === "/app" || path === "/" || path === "") {
       setMobileMode("nav");
     } else {
-      if (!sessionStorage.getItem("__dbc_mobile_nav_override__")) {
-        setMobileMode("chat");
-      } else {
+      if (sessionStorage.getItem("__dbc_mobile_nav_override__") === "1") {
         setMobileMode("nav");
+      } else {
+        setMobileMode("chat");
       }
     }
   }
@@ -412,121 +422,49 @@
   function tagDiscordMobileLayout() {
     if (!document.body) return;
 
-    var guildsList = document.querySelector('[data-list-id="guildsnav"], nav[class*="guilds_"]');
-    var isAuth = !!guildsList && window.location.pathname.indexOf("/login") !== 0;
-    document.body.classList.toggle("dbc-authenticated", isAuth);
-
-    if (!isAuth) {
-      document.body.classList.remove("dbc-mode-nav", "dbc-mode-chat", "dbc-members-open");
-      return;
-    }
-
     updateMobileMode();
 
-    var guildsNav = guildsList.closest("nav") || guildsList.parentElement;
-    var chanList = document.querySelector('[data-list-id="channels"], [data-list-id^="private-channels"], [class*="sidebar_"]');
-    var mainEl =
-      document.querySelector('main[aria-label], main') ||
-      (document.querySelector('[data-list-id^="chat-messages"]')
-        ? document.querySelector('[data-list-id^="chat-messages"]').closest("section, div")
-        : document.querySelector('[class*="chat_"]'));
-
-    // Identify rail, channel pane, and outer shell
-    if (guildsNav && chanList) {
-      var common = guildsNav.parentElement;
-      while (common && common !== document.body && !common.contains(chanList)) {
-        common = common.parentElement;
-      }
-
-      if (common && common !== document.body) {
-        var containsMain = mainEl ? common.contains(mainEl) : common.children.length >= 2 && common.lastElementChild && !common.lastElementChild.contains(chanList);
-        if (!containsMain) {
-          common.setAttribute("data-dbc-drawer", "unified");
-          if (common.parentElement) {
-            common.parentElement.setAttribute("data-dbc-shell", "1");
-            Array.from(common.parentElement.children).forEach(function (sib) {
-              if (sib !== common && sib.tagName === "DIV") {
-                sib.setAttribute("data-dbc-content", "1");
-              }
-            });
-          }
-          var chanWrap = chanList;
-          while (chanWrap && chanWrap.parentElement !== common) {
-            chanWrap = chanWrap.parentElement;
-          }
-          if (chanWrap) chanWrap.setAttribute("data-dbc-chan-inner", "1");
-        } else {
-          common.setAttribute("data-dbc-shell", "1");
-          var gTop = guildsNav;
-          while (gTop && gTop.parentElement !== common) gTop = gTop.parentElement;
-          var cTop = chanList;
-          while (cTop && cTop.parentElement !== common) cTop = cTop.parentElement;
-
-          if (gTop && cTop && gTop === cTop) {
-            gTop.setAttribute("data-dbc-drawer", "unified");
-            Array.from(common.children).forEach(function (sib) {
-              if (sib !== gTop && sib.tagName === "DIV") sib.setAttribute("data-dbc-content", "1");
-            });
-          } else {
-            if (gTop) gTop.setAttribute("data-dbc-guilds-rail", "1");
-            if (cTop) cTop.setAttribute("data-dbc-chan-pane", "1");
-            Array.from(common.children).forEach(function (sib) {
-              if (sib !== gTop && sib !== cTop && sib.tagName === "DIV") {
-                sib.setAttribute("data-dbc-content", "1");
-              }
-            });
-          }
-        }
-      }
+    // 1. Hide Desktop Titlebars / Window Chrome immediately
+    var titleBars = document.querySelectorAll(
+      '[data-window-chrome="true"], [data-window-chrome], [class*="winTitleBar_"], [class*="typeWindows_"], [class*="withFrame_"]'
+    );
+    for (var i = 0; i < titleBars.length; i++) {
+      titleBars[i].style.display = "none";
+      titleBars[i].setAttribute("data-dbc-desktop-titlebar", "1");
     }
 
-    // Hide any Windows Titlebar or Vesktop header bar if rendered
-    var titleBars = document.querySelectorAll('[class*="winTitleBar_"], [class*="typeWindows_"], [class*="withFrame_"]');
-    titleBars.forEach(function (el) {
-      el.setAttribute("data-dbc-desktop-titlebar", "1");
-    });
+    // 2. Identify Guilds Server Rail
+    var guildsNav =
+      document.querySelector('[data-list-id="guildsnav"]') ||
+      document.querySelector('nav[class*="guilds_"]') ||
+      document.querySelector('nav[aria-label*="Servers"], nav[aria-label*="Máy chủ"]');
+    if (guildsNav) {
+      guildsNav.setAttribute("data-dbc-guilds-rail", "1");
+    }
 
-    // Tag Channel Header Bar
-    if (mainEl) {
+    // 3. Identify Channels Sidebar
+    var chanSidebar = document.querySelector('[class*="sidebar_"]');
+    if (chanSidebar) {
+      chanSidebar.setAttribute("data-dbc-chan-pane", "1");
+    }
+
+    // 4. Identify Chat area & Header Bar
+    var chatArea = document.querySelector('[class*="chat_"], main');
+    if (chatArea) {
+      chatArea.setAttribute("data-dbc-content", "1");
       var headerBar =
-        mainEl.querySelector('section[aria-label]') ||
-        (mainEl.firstElementChild && mainEl.firstElementChild.offsetHeight <= 64 ? mainEl.firstElementChild : null);
+        chatArea.querySelector('section[aria-label]') ||
+        chatArea.querySelector('section[class*="title_"]') ||
+        (chatArea.firstElementChild && chatArea.firstElementChild.offsetHeight <= 64 ? chatArea.firstElementChild : null);
       if (headerBar) {
         headerBar.setAttribute("data-dbc-header-bar", "1");
-        var mBtn = headerBar.querySelector('[aria-label*="Member"], [aria-label*="ThÃ nh viÃªn"], [aria-label*="thÃ nh viÃªn"]');
-        if (mBtn) mBtn.setAttribute("data-dbc-member-toggle-btn", "1");
       }
     }
 
-    // Tag Right-Hand Members Sidebar Pane
+    // 5. Right-Hand Members Sidebar Pane
     var membersList = document.querySelector('[data-list-id^="members-"], [class*="membersWrap_"]');
-    if (membersList && mainEl) {
-      var mPane = membersList;
-      while (mPane && mPane.parentElement && !mPane.parentElement.contains(mainEl)) {
-        mPane = mPane.parentElement;
-      }
-      if (mPane && mPane !== document.body && !mPane.contains(mainEl)) {
-        mPane.setAttribute("data-dbc-members-pane", "1");
-      }
-    }
-
-    // Tag Settings Root
-    var settingsTabList = document.querySelector('[role="tablist"][aria-orientation="vertical"]');
-    if (settingsTabList) {
-      var navRegion = settingsTabList;
-      while (navRegion && navRegion.parentElement && navRegion.parentElement.children.length < 2) {
-        navRegion = navRegion.parentElement;
-      }
-      if (navRegion && navRegion.parentElement && !navRegion.parentElement.contains(guildsList)) {
-        var settingsRoot = navRegion.parentElement;
-        settingsRoot.setAttribute("data-dbc-settings-root", "1");
-        navRegion.setAttribute("data-dbc-settings-nav", "1");
-        Array.from(settingsRoot.children).forEach(function (sib) {
-          if (sib !== navRegion) sib.setAttribute("data-dbc-settings-body", "1");
-        });
-      }
-    } else {
-      document.body.classList.remove("dbc-settings-content-focused");
+    if (membersList) {
+      membersList.setAttribute("data-dbc-members-pane", "1");
     }
 
     updateProfileStrip();
@@ -667,8 +605,8 @@
           return;
         }
 
-        // Server icon click (inside guildsnav): STAY IN NAV MODE! So user sees channels list for that server!
-        if (target.closest('[data-list-id="guildsnav"], nav[class*="guilds_"]')) {
+        // Server icon click (inside guilds rail): STAY IN NAV MODE! So user sees channels list for that server!
+        if (target.closest('[data-dbc-guilds-rail="1"], [data-list-id="guildsnav"], nav[class*="guilds_"]')) {
           setMobileMode("nav");
           return;
         }
@@ -680,7 +618,7 @@
         }
 
         // Tapping Member List icon in Header Bar toggles members drawer
-        if (target.closest('[data-dbc-member-toggle-btn="1"]') || target.closest('[data-dbc-header-bar="1"] [aria-label*="Member"], [data-dbc-header-bar="1"] [aria-label*="ThÃ nh viÃªn"], [data-dbc-header-bar="1"] [aria-label*="thÃ nh viÃªn"]')) {
+        if (target.closest('[data-dbc-member-toggle-btn="1"], [aria-label*="Member"], [aria-label*="Thành viên"], [aria-label*="thành viên"]')) {
           document.body.classList.toggle("dbc-members-open");
           return;
         }
@@ -690,15 +628,14 @@
           '[data-list-id="channels"] a[href^="/channels/"], ' +
             '[data-list-id="channels"] [data-list-item-id^="channels___"], ' +
             '[data-list-id^="private-channels"] a[href^="/channels/@me/"], ' +
-            '[class*="sidebar_"] a[href^="/channels/"]'
+            '[class*="sidebar_"] a[href^="/channels/"], ' +
+            '[class*="sidebar_"] [role="listitem"]'
         );
         if (chanItem) {
-          var href = chanItem.getAttribute("href") || "";
-          var itemId = chanItem.getAttribute("data-list-item-id") || "";
-          if (href.split("/").length >= 4 || (itemId.indexOf("channels___") === 0 && itemId.indexOf("___") !== -1 && !chanItem.getAttribute("aria-expanded"))) {
+          if (!chanItem.getAttribute("aria-expanded") || chanItem.tagName === "A") {
             setTimeout(function () {
               setMobileMode("chat");
-            }, 100);
+            }, 80);
           }
         }
       },
