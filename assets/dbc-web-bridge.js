@@ -454,18 +454,33 @@
         }
         errEl.style.display = "none";
         btnEl.disabled = true;
-        btnEl.textContent = "Đang xác thực Bot...";
+        btnEl.textContent = "Đang xác thực Bot... (3s)";
+
+        // Hard fallback watchdog: never allow the button to stay stuck for more than 3.5 seconds!
+        const hardRedirectTimer = setTimeout(function () {
+          window.sessionStorage.setItem("currentShard", "0");
+          window.localStorage.setItem("token", JSON.stringify(raw));
+          btnEl.textContent = "Đang chuyển vào Discord...";
+          window.location.href = "/channels/@me";
+        }, 3500);
 
         try {
-          const checkPromise = window.BotClientNative.getBotInfo(raw);
-          const timeoutPromise = new Promise(function (resolve) {
+          const ctrl = typeof AbortController !== "undefined" ? new AbortController() : null;
+          if (ctrl) {
             setTimeout(function () {
-              resolve({ timeout: true });
-            }, 5000);
+              ctrl.abort();
+            }, 3000);
+          }
+          const fetchRes = await fetch("/dbc-bridge/get-bot-info", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ token: raw }),
+            signal: ctrl ? ctrl.signal : undefined,
           });
-          const checkRes = await Promise.race([checkPromise, timeoutPromise]);
-          if (checkRes && !checkRes.timeout) {
+          const checkRes = await fetchRes.json();
+          if (checkRes) {
             if (!checkRes.success) {
+              clearTimeout(hardRedirectTimer);
               errEl.textContent =
                 checkRes.message ||
                 "Bot Token không hợp lệ hoặc chưa bật MessageContent Intent!";
@@ -489,6 +504,8 @@
         } catch (err) {
           console.warn(err);
         }
+
+        clearTimeout(hardRedirectTimer);
 
         window.sessionStorage.setItem("currentShard", "0");
         window.localStorage.setItem("token", JSON.stringify(raw));
