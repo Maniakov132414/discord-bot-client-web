@@ -1,11 +1,14 @@
 /**
- * DiscordBotClient Mobile & iOS Safari PWA Responsive Overlay
- * Keeps 100% of original Discord + Vencord UI while enabling touch drawers on mobile screens
+ * DiscordBotClient — Native Discord Mobile App UI & iOS Safari PWA Stylesheet
+ * Transforms Discord's Rspack Visual Refresh DOM into a genuine iOS/Android Mobile App experience
+ * on screens <= 820px (Slide-over Server+Channel Drawer, Fullscreen Chat, Right Members Drawer,
+ * Mobile Bottom Tab Bar, Touch Settings Navigation), while keeping 100% Desktop UI on > 820px.
  */
 
 :root {
   --dbc-safe-top: env(safe-area-inset-top, 0px);
   --dbc-safe-bottom: env(safe-area-inset-bottom, 0px);
+  --dbc-tabbar-h: 56px;
 }
 
 /* Discohook Fullscreen Modal Overlay */
@@ -13,7 +16,7 @@
   position: fixed;
   inset: 0;
   z-index: 999999;
-  background: rgba(0, 0, 0, 0.8);
+  background: rgba(0, 0, 0, 0.85);
   display: flex;
   flex-direction: column;
   padding-top: var(--dbc-safe-top);
@@ -25,25 +28,25 @@
 }
 
 #dbc-discohook-header {
-  height: 44px;
-  background: #1e1f22;
+  height: 46px;
+  background: #1a1b1e;
   color: #f2f3f5;
   display: flex;
   align-items: center;
   justify-content: space-between;
   padding: 0 14px;
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-  font-size: 14px;
+  font-size: 13px;
   font-weight: 700;
   border-bottom: 1px solid rgba(255, 255, 255, 0.08);
 }
 
 #dbc-discohook-close {
-  background: #f23f43;
+  background: #da373c;
   color: #fff;
   border: none;
-  border-radius: 6px;
-  padding: 5px 12px;
+  border-radius: 8px;
+  padding: 6px 12px;
   font-size: 13px;
   font-weight: 600;
   cursor: pointer;
@@ -56,76 +59,348 @@
   background: #2b2d31;
 }
 
-/* Floating Mobile Sidebar Toggle Button (Only shown on small screens <= 820px) */
-#dbc-mobile-nav-fab {
+/* Hide Mobile App Controls on Desktop (> 820px) */
+#dbc-mobile-nav-fab,
+#dbc-mobile-backdrop,
+#dbc-mobile-tabbar,
+#dbc-settings-back-btn {
   display: none;
 }
 
+/* ============================================================================
+ * MOBILE APP MODE (Phones & Compact Portrait Screens <= 820px)
+ * ============================================================================ */
 @media (max-width: 820px) {
-  html, body, #app-mount {
+  html,
+  body,
+  #app-mount {
     width: 100vw !important;
+    max-width: 100vw !important;
     height: 100dvh !important;
+    max-height: 100dvh !important;
     overflow: hidden !important;
-    padding-top: var(--dbc-safe-top);
-    padding-bottom: var(--dbc-safe-bottom);
+    background: #1a1b1e !important;
+    -webkit-text-size-adjust: 100%;
   }
 
-  #dbc-mobile-nav-fab {
+  /* Reserve space for iOS Notch (top) and Mobile Bottom Tab Bar (when logged in & keyboard closed) */
+  body.dbc-authenticated:not(.dbc-keyboard-open) #app-mount {
+    padding-top: var(--dbc-safe-top) !important;
+    padding-bottom: calc(var(--dbc-tabbar-h) + var(--dbc-safe-bottom)) !important;
+    box-sizing: border-box !important;
+  }
+
+  body:not(.dbc-authenticated) #app-mount,
+  body.dbc-keyboard-open #app-mount {
+    padding-top: var(--dbc-safe-top) !important;
+    padding-bottom: var(--dbc-safe-bottom) !important;
+    box-sizing: border-box !important;
+  }
+
+  /* Hide Desktop Windows Titlebar injected by Vesktop patch on Mobile */
+  [data-dbc-desktop-titlebar="1"] {
+    display: none !important;
+  }
+
+  /* 1. Fullscreen Main Content / Chat Area (100% phone width, never squished!) */
+  [data-dbc-shell="1"] {
+    width: 100vw !important;
+    max-width: 100vw !important;
+    min-width: 0 !important;
+    position: relative !important;
+  }
+
+  [data-dbc-content="1"],
+  [data-dbc-content="1"] > div,
+  main[aria-label],
+  main {
+    width: 100vw !important;
+    max-width: 100vw !important;
+    min-width: 0 !important;
+    flex: 1 1 100vw !important;
+  }
+
+  /* 2. Slide-Over Left Navigation Drawer (Servers Rail + Channels/DMs + Bot User Panel) */
+  /* Case A: Unified Visual Refresh Left Wrapper */
+  [data-dbc-drawer="unified"] {
+    position: fixed !important;
+    top: var(--dbc-safe-top) !important;
+    left: 0 !important;
+    bottom: calc(var(--dbc-tabbar-h) + var(--dbc-safe-bottom)) !important;
+    width: 88vw !important;
+    max-width: 360px !important;
+    z-index: 10020 !important;
+    background: #121316 !important;
+    box-shadow: 8px 0 32px rgba(0, 0, 0, 0.65) !important;
+    border-right: 1px solid rgba(255, 255, 255, 0.08) !important;
+    transform: translate3d(-105%, 0, 0) !important;
+    transition: transform 0.24s cubic-bezier(0.22, 1, 0.36, 1) !important;
+    will-change: transform;
+    display: flex !important;
+  }
+
+  body.dbc-keyboard-open [data-dbc-drawer="unified"] {
+    bottom: var(--dbc-safe-bottom) !important;
+  }
+
+  body.dbc-drawer-open [data-dbc-drawer="unified"] {
+    transform: translate3d(0, 0, 0) !important;
+  }
+
+  /* Make Channels column fill remaining width inside unified drawer */
+  [data-dbc-drawer="unified"] [data-dbc-chan-inner="1"] {
+    flex: 1 1 auto !important;
+    width: auto !important;
+    min-width: 0 !important;
+    max-width: none !important;
+  }
+
+  /* Case B: Split Sibling Guilds Rail + Channels Sidebar */
+  [data-dbc-guilds-rail="1"] {
+    position: fixed !important;
+    top: var(--dbc-safe-top) !important;
+    left: 0 !important;
+    bottom: calc(var(--dbc-tabbar-h) + var(--dbc-safe-bottom)) !important;
+    width: 68px !important;
+    z-index: 10021 !important;
+    background: #111214 !important;
+    transform: translate3d(-110%, 0, 0) !important;
+    transition: transform 0.24s cubic-bezier(0.22, 1, 0.36, 1) !important;
+  }
+
+  [data-dbc-chan-pane="1"] {
+    position: fixed !important;
+    top: var(--dbc-safe-top) !important;
+    left: 68px !important;
+    bottom: calc(var(--dbc-tabbar-h) + var(--dbc-safe-bottom)) !important;
+    width: calc(88vw - 68px) !important;
+    max-width: 292px !important;
+    z-index: 10020 !important;
+    background: #1a1b1e !important;
+    box-shadow: 8px 0 32px rgba(0, 0, 0, 0.65) !important;
+    border-right: 1px solid rgba(255, 255, 255, 0.08) !important;
+    transform: translate3d(calc(-100% - 75px), 0, 0) !important;
+    transition: transform 0.24s cubic-bezier(0.22, 1, 0.36, 1) !important;
+  }
+
+  body.dbc-drawer-open [data-dbc-guilds-rail="1"],
+  body.dbc-drawer-open [data-dbc-chan-pane="1"] {
+    transform: translate3d(0, 0, 0) !important;
+  }
+
+  /* Ensure resize handles don't block touch inside mobile drawer */
+  [data-dbc-drawer="unified"] [role="separator"],
+  [data-dbc-chan-pane="1"] [role="separator"] {
+    display: none !important;
+  }
+
+  /* 3. Slide-Over Right Members / Profile Drawer */
+  [data-dbc-members-pane="1"] {
+    position: fixed !important;
+    top: var(--dbc-safe-top) !important;
+    right: 0 !important;
+    bottom: calc(var(--dbc-tabbar-h) + var(--dbc-safe-bottom)) !important;
+    width: 82vw !important;
+    max-width: 310px !important;
+    z-index: 10020 !important;
+    background: #1a1b1e !important;
+    box-shadow: -8px 0 32px rgba(0, 0, 0, 0.65) !important;
+    border-left: 1px solid rgba(255, 255, 255, 0.08) !important;
+    transform: translate3d(105%, 0, 0) !important;
+    transition: transform 0.24s cubic-bezier(0.22, 1, 0.36, 1) !important;
+  }
+
+  body.dbc-members-open [data-dbc-members-pane="1"] {
+    transform: translate3d(0, 0, 0) !important;
+  }
+
+  /* 4. Frosted Dimmed Backdrop when Left or Right Drawer is Open */
+  #dbc-mobile-backdrop {
+    display: block;
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: calc(var(--dbc-tabbar-h) + var(--dbc-safe-bottom));
+    z-index: 10015;
+    background: rgba(0, 0, 0, 0.58);
+    backdrop-filter: blur(2px);
+    -webkit-backdrop-filter: blur(2px);
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.22s ease;
+  }
+
+  body.dbc-drawer-open #dbc-mobile-backdrop,
+  body.dbc-members-open #dbc-mobile-backdrop {
+    opacity: 1;
+    pointer-events: auto;
+  }
+
+  /* 5. Top-Left Mobile Header Drawer Button (Integrated cleanly in Channel Top Bar) */
+  body.dbc-authenticated #dbc-mobile-nav-fab {
     display: flex;
     position: fixed;
-    top: calc(10px + var(--dbc-safe-top));
-    left: 10px;
-    z-index: 10005;
-    width: 38px;
-    height: 38px;
+    top: calc(7px + var(--dbc-safe-top));
+    left: 8px;
+    z-index: 10010;
+    width: 36px;
+    height: 36px;
     border-radius: 10px;
-    background: #5865f2;
+    background: rgba(88, 101, 242, 0.92);
     color: #ffffff;
-    border: 1px solid rgba(255, 255, 255, 0.2);
-    box-shadow: 0 4px 14px rgba(0, 0, 0, 0.45);
+    border: 1px solid rgba(255, 255, 255, 0.16);
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.35);
     align-items: center;
     justify-content: center;
-    font-size: 20px;
     cursor: pointer;
+    user-select: none;
+    -webkit-tap-highlight-color: transparent;
+    padding: 0;
+  }
+
+  body.dbc-drawer-open #dbc-mobile-nav-fab {
+    opacity: 0;
+    pointer-events: none;
+  }
+
+  /* Shift Channel Header Title right so #dbc-mobile-nav-fab never overlaps #channel-name */
+  [data-dbc-header-bar="1"] {
+    padding-left: 50px !important;
+  }
+
+  /* Hide cluttered desktop-only header icons (Threads/Pinned/Inbox/Help) if overflowing on narrow phones */
+  [data-dbc-header-bar="1"] [role="toolbar"] {
+    gap: 4px !important;
+  }
+
+  /* 6. Clean Mobile Chat Input & Login Card */
+  form {
+    padding-left: 8px !important;
+    padding-right: 8px !important;
+  }
+
+  /* Make Login Screen look like Native Discord Mobile Login */
+  body:not(.dbc-authenticated) form {
+    width: 92vw !important;
+    max-width: 400px !important;
+    margin: 0 auto !important;
+    border-radius: 16px !important;
+  }
+
+  /* 7. Native Discord Mobile Bottom Navigation Tab Bar */
+  body.dbc-authenticated:not(.dbc-keyboard-open) #dbc-mobile-tabbar {
+    display: flex;
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    height: calc(var(--dbc-tabbar-h) + var(--dbc-safe-bottom));
+    padding-bottom: var(--dbc-safe-bottom);
+    background: #111214;
+    border-top: 1px solid rgba(255, 255, 255, 0.08);
+    z-index: 10030;
+    align-items: center;
+    justify-content: space-around;
     user-select: none;
     -webkit-tap-highlight-color: transparent;
   }
 
-  /* When sidebar is collapsed on mobile, hide guilds nav + channels sidebar to give 100% width to chat */
-  body.dbc-mobile-sidebar-hidden nav[aria-label][class*="guilds_"],
-  body.dbc-mobile-sidebar-hidden div[class*="sidebar_"] {
+  .dbc-tab-btn {
+    flex: 1;
+    height: var(--dbc-tabbar-h);
+    background: transparent;
+    border: none;
+    color: #949ba4;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 3px;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    font-size: 10.5px;
+    font-weight: 600;
+    padding: 0 2px;
+    cursor: pointer;
+    transition: color 0.15s ease, transform 0.1s ease;
+  }
+
+  .dbc-tab-btn:active {
+    transform: scale(0.94);
+  }
+
+  .dbc-tab-btn.dbc-active {
+    color: #f2f3f5;
+  }
+
+  .dbc-tab-btn.dbc-active svg {
+    color: #5865f2;
+  }
+
+  .dbc-tab-btn svg {
+    width: 21px;
+    height: 21px;
+    stroke-width: 2;
+  }
+
+  /* 8. Mobile-Friendly User Settings & Server Settings (iOS Drill-Down Style) */
+  [data-dbc-settings-root="1"] {
+    flex-direction: column !important;
+    width: 100vw !important;
+    max-width: 100vw !important;
+  }
+
+  [data-dbc-settings-nav="1"] {
+    width: 100vw !important;
+    max-width: 100vw !important;
+    flex: 0 0 auto !important;
+    max-height: 38dvh !important;
+    overflow-y: auto !important;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1) !important;
+  }
+
+  body.dbc-settings-content-focused [data-dbc-settings-nav="1"] {
     display: none !important;
   }
 
-  /* Add left padding to channel header so the floating button doesn't overlap the channel title */
-  section[class*="title_"] {
-    padding-left: 52px !important;
-  }
-
-  /* Make modals and settings responsive on mobile screens */
-  div[class*="modal_"],
-  div[class*="root_"][role="dialog"] {
-    max-width: 96vw !important;
-    max-height: 90dvh !important;
-  }
-
-  /* Settings sidebar layout on narrow screens */
-  div[class*="standardSidebarView_"] {
-    flex-direction: column !important;
-  }
-  div[class*="sidebarRegion_"] {
-    flex: 0 0 auto !important;
-    max-height: 32dvh !important;
-    overflow-y: auto !important;
-    width: 100% !important;
-  }
-  div[class*="contentRegion_"] {
-    flex: 1 1 auto !important;
-    width: 100% !important;
-  }
-  div[class*="contentColumn_"] {
+  [data-dbc-settings-body="1"] {
+    width: 100vw !important;
+    max-width: 100vw !important;
     min-width: 0 !important;
-    max-width: 100% !important;
-    padding: 16px 12px !important;
+    flex: 1 1 auto !important;
+    overflow-y: auto !important;
+  }
+
+  [data-dbc-settings-body="1"] > div {
+    min-width: 0 !important;
+    max-width: 100vw !important;
+    padding: 16px 14px 80px 14px !important;
+    box-sizing: border-box !important;
+  }
+
+  body.dbc-settings-content-focused #dbc-settings-back-btn {
+    display: inline-flex;
+    position: fixed;
+    top: calc(10px + var(--dbc-safe-top));
+    left: 12px;
+    z-index: 10050;
+    align-items: center;
+    gap: 6px;
+    padding: 7px 12px;
+    border-radius: 999px;
+    background: #5865f2;
+    color: #fff;
+    border: none;
+    font-size: 12.5px;
+    font-weight: 700;
+    box-shadow: 0 4px 14px rgba(0, 0, 0, 0.45);
+    cursor: pointer;
+  }
+
+  /* Modals & Dialogs fit cleanly on Mobile */
+  [role="dialog"],
+  [data-mana-component="layer-modal"] {
+    max-width: 95vw !important;
+    max-height: 88dvh !important;
   }
 }
