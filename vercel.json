@@ -1,0 +1,23 @@
+{
+  "version": 2,
+  "builds": [
+    {
+      "src": "build/web-server.js",
+      "use": "@vercel/node",
+      "config": {
+        "includeFiles": [
+          "build/**",
+          "assets/**",
+          "VencordExtension/**",
+          "package.json"
+        ]
+      }
+    }
+  ],
+  "routes": [
+    {
+      "src": "/(.*)",
+      "dest": "/build/web-server.js"
+    }
+  ]
+}

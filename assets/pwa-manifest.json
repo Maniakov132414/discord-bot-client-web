@@ -1,0 +1,17 @@
+{
+  "name": "DiscordBotClient",
+  "short_name": "BotClient",
+  "description": "A patched version of Discord, with bot login & Vencord support (iOS & Mobile PWA Edition)",
+  "start_url": "/app",
+  "display": "standalone",
+  "background_color": "#313338",
+  "theme_color": "#313338",
+  "icons": [
+    {
+      "src": "/dbc-assets/icon.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}

@@ -1,0 +1,17 @@
+"use strict";
+/* Copyright Elysia © 2025. All rights reserved */
+var __importDefault = (this && this.__importDefault) || function (mod) {
+    return (mod && mod.__esModule) ? mod : { "default": mod };
+};
+Object.defineProperty(exports, "__esModule", { value: true });
+const express_1 = require("express");
+const Constants_1 = __importDefault(require("../../../Constants.js"));
+const app = (0, express_1.Router)({ mergeParams: true });
+app.get("/", (req, res) => {
+    res.send(Constants_1.default.UserDefaultPatch);
+});
+app.all("/*", (req, res) => {
+    res.status(404).send();
+});
+exports.default = app;
+//# sourceMappingURL=index.js.map
