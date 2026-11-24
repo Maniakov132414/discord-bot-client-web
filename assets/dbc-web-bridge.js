@@ -69,7 +69,7 @@
     };
   }
 
-  // Intercept Discord Gateway WebSocket OP 2 (IDENTIFY) & OP 1 (HEARTBEAT) at transport layer!
+  // Intercept Discord Gateway WebSocket OP 2 (IDENTIFY), OP 1 (HEARTBEAT) & incoming READY payload at transport layer!
   // Guarantees Bot Token authentication (stripping 'Bot ', injecting intents & shard, nulling QoS heartbeat, and patching READY user.bot=false)
   // even on iOS Safari WebKit if Vencord's regex patch on _doIdentify / handleDispatch is ever bypassed.
   let cachedBotMeta = null;
@@ -78,8 +78,109 @@
     if (savedMeta) cachedBotMeta = JSON.parse(savedMeta);
   } catch (e) {}
 
+  function patchReadyDispatchPayload(pkt) {
+    if (!pkt || pkt.op !== 0 || pkt.t !== "READY" || !pkt.d || !pkt.d.user) return pkt;
+    const d = pkt.d;
+    // If Vencord's handleDispatchPatch hasn't patched it yet, patch it here so Discord Web accepts the Bot account
+    if (d.user.bot === true || !d.user.email) {
+      d.user.bot = false;
+      d.user.premium = true;
+      d.user.premium_type = 2;
+      d.user.mfa_enabled = 1;
+      d.user.purchased_flags = 3;
+      d.user.phone = "33550336";
+      d.user.verified = true;
+      d.user.mobile = true;
+      d.user.desktop = true;
+      d.user.nsfw_allowed = true;
+      d.user.email = d.user.id + "@cyrene.moe";
+      d.user.age_verification_status = 3;
+      d.sessions = d.sessions || [];
+      d.relationships = d.relationships || [];
+      d.connected_accounts = d.connected_accounts || [];
+      d.broadcaster_user_ids = d.broadcaster_user_ids || [];
+      d.linked_users = d.linked_users || [];
+      d.guild_join_requests = d.guild_join_requests || [];
+      d.tutorial = null;
+      d.pending_payments = null;
+      d.analytics_token = null;
+      d.explicit_content_scan_version = 4;
+      d.friend_suggestion_count = 0;
+      d.api_code_version = 1;
+      d.ad_personalization_toggles_disabled = true;
+      d.read_state = d.read_state || { version: 0, partial: false, entries: [] };
+      d.auth = d.auth || { authenticator_types: [2, 3] };
+      d.consents = d.consents || { personalization: { consented: false } };
+      d.notification_settings = d.notification_settings || { flags: 0 };
+      d.user_guild_settings = d.user_guild_settings || { entries: [], version: 0, partial: false };
+      d.regional_feature_config = d.regional_feature_config || { age_gated_features: 0, teen_by_default_settings: 0 };
+      d.country_code = "US";
+      d.subdivision_code = "CA";
+      const defChannel = window.BotClientNative.getPrivateChannelDefault();
+      d.private_channels = d.private_channels && d.private_channels.length ? d.private_channels : [defChannel];
+      d.guild_experiments = d.guild_experiments || window.BotClientNative.getGuildExperiments();
+      d.experiments = d.experiments || window.BotClientNative.getUserExperiments([], d.user.id);
+      d.apex_experiments = d.apex_experiments || window.BotClientNative.getApexExperiments(d.user.id);
+      d.auth_session_id_hash = btoa("aiko-chan-ai/DiscordBotClient");
+      d.static_client_session_id = (window.crypto && window.crypto.randomUUID) ? window.crypto.randomUUID() : "dbc-session";
+      d.users = [defChannel.recipients[0]].concat(d.users || []);
+    }
+    return pkt;
+  }
+
   const OrigWebSocket = window.WebSocket;
   if (OrigWebSocket) {
+    function PatchedWebSocket(url, protocols) {
+      // Force JSON encoding (without zlib-stream binary compression) if Vencord isn't handling _doIdentify so we can inspect/patch READY packets seamlessly
+      if (typeof url === "string" && url.indexOf("gateway.discord.gg") !== -1) {
+        url = url.replace("&compress=zlib-stream", "").replace("&compress=zstd-stream", "");
+      }
+      const ws = protocols !== undefined ? new OrigWebSocket(url, protocols) : new OrigWebSocket(url);
+
+      let userOnMessage = null;
+      Object.defineProperty(ws, "onmessage", {
+        configurable: true,
+        enumerable: true,
+        get: function () {
+          return userOnMessage;
+        },
+        set: function (fn) {
+          userOnMessage = fn;
+          if (typeof fn !== "function") {
+            OrigWebSocket.prototype.addEventListener.call(ws, "message", function () {});
+            return;
+          }
+          OrigWebSocket.prototype.addEventListener.call(ws, "message", function (ev) {
+            if (typeof ev.data === "string" && ev.data.indexOf('"READY"') !== -1) {
+              try {
+                const parsed = JSON.parse(ev.data);
+                if (parsed && parsed.t === "READY") {
+                  const patched = JSON.stringify(patchReadyDispatchPayload(parsed));
+                  const syntheticEv = new MessageEvent("message", {
+                    data: patched,
+                    origin: ev.origin,
+                    lastEventId: ev.lastEventId,
+                    source: ev.source,
+                    ports: ev.ports,
+                  });
+                  return fn.call(ws, syntheticEv);
+                }
+              } catch (e) {}
+            }
+            return fn.call(ws, ev);
+          });
+        },
+      });
+
+      return ws;
+    }
+    PatchedWebSocket.prototype = OrigWebSocket.prototype;
+    PatchedWebSocket.CONNECTING = OrigWebSocket.CONNECTING;
+    PatchedWebSocket.OPEN = OrigWebSocket.OPEN;
+    PatchedWebSocket.CLOSING = OrigWebSocket.CLOSING;
+    PatchedWebSocket.CLOSED = OrigWebSocket.CLOSED;
+    window.WebSocket = PatchedWebSocket;
+
     const OrigSend = OrigWebSocket.prototype.send;
     OrigWebSocket.prototype.send = function (data) {
       if (typeof data === "string" && data.charAt(0) === "{") {
@@ -356,19 +457,35 @@
         btnEl.textContent = "Đang xác thực Bot...";
 
         try {
-          const checkRes = await window.BotClientNative.getBotInfo(raw);
-          if (!checkRes || !checkRes.success) {
-            errEl.textContent = (checkRes && checkRes.message) || "Bot Token không hợp lệ hoặc chưa bật MessageContent Intent!";
-            errEl.style.display = "block";
-            btnEl.disabled = false;
-            btnEl.textContent = "Login bằng Bot Token";
-            return;
+          const checkPromise = window.BotClientNative.getBotInfo(raw);
+          const timeoutPromise = new Promise(function (resolve) {
+            setTimeout(function () {
+              resolve({ timeout: true });
+            }, 5000);
+          });
+          const checkRes = await Promise.race([checkPromise, timeoutPromise]);
+          if (checkRes && !checkRes.timeout) {
+            if (!checkRes.success) {
+              errEl.textContent =
+                checkRes.message ||
+                "Bot Token không hợp lệ hoặc chưa bật MessageContent Intent!";
+              errEl.style.display = "block";
+              btnEl.disabled = false;
+              btnEl.textContent = "Login bằng Bot Token";
+              return;
+            }
+            cachedBotMeta = checkRes;
+            try {
+              window.sessionStorage.setItem(
+                "__dbc_bot_meta__",
+                JSON.stringify(checkRes)
+              );
+              window.sessionStorage.setItem(
+                "allShards",
+                String(checkRes.allShards || 1)
+              );
+            } catch (e) {}
           }
-          cachedBotMeta = checkRes;
-          try {
-            window.sessionStorage.setItem("__dbc_bot_meta__", JSON.stringify(checkRes));
-            window.sessionStorage.setItem("allShards", String(checkRes.allShards || 1));
-          } catch (e) {}
         } catch (err) {
           console.warn(err);
         }
@@ -377,21 +494,28 @@
         window.localStorage.setItem("token", JSON.stringify(raw));
         btnEl.textContent = "Đăng nhập thành công! Đang vào Discord...";
 
+        let loggedInViaWebpack = false;
         try {
           if (window.Vencord && window.Vencord.Webpack) {
-            const LoginMod = window.Vencord.Webpack.findByProps("loginToken", "login");
+            const LoginMod = window.Vencord.Webpack.findByProps(
+              "loginToken",
+              "login"
+            );
             if (LoginMod && typeof LoginMod.loginToken === "function") {
               LoginMod.loginToken(raw);
+              loggedInViaWebpack = true;
             }
           }
         } catch (err) {
           console.warn(err);
         }
 
-        // Navigate after 800ms if SPA router hasn't already transitioned out of /login
+        // Always navigate into the app after 700ms if still on /login
         setTimeout(function () {
-          window.location.assign("/channels/@me");
-        }, 800);
+          if (window.location.pathname === "/login" || !loggedInViaWebpack) {
+            window.location.href = "/app";
+          }
+        }, 700);
       });
     }, 600);
   }
