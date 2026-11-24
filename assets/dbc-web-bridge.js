@@ -435,16 +435,33 @@
 
     // 2. Identify Guilds Server Rail
     var guildsNav =
-      document.querySelector('[data-list-id="guildsnav"]') ||
       document.querySelector('nav[class*="guilds_"]') ||
+      document.querySelector('[data-list-id="guildsnav"]') ||
       document.querySelector('nav[aria-label*="Servers"], nav[aria-label*="Máy chủ"]');
     if (guildsNav) {
-      guildsNav.setAttribute("data-dbc-guilds-rail", "1");
+      var gEl = guildsNav.tagName === "NAV" ? guildsNav : guildsNav.closest("nav") || guildsNav;
+      gEl.setAttribute("data-dbc-guilds-rail", "1");
+      guildsNav = gEl;
     }
 
-    // 3. Identify Channels Sidebar
+    // 3. Identify Channels Sidebar (handle Discord Visual Refresh where .sidebar_ wraps BOTH .guilds_ and .sidebarList_)
     var chanSidebar = document.querySelector('[class*="sidebar_"]');
-    if (chanSidebar) {
+    var chanListPane = document.querySelector('[class*="sidebarList_"]');
+    if (chanSidebar && guildsNav && chanSidebar.contains(guildsNav)) {
+      chanSidebar.setAttribute("data-dbc-drawer", "unified");
+      chanSidebar.removeAttribute("data-dbc-chan-pane");
+      if (chanListPane) {
+        chanListPane.setAttribute("data-dbc-chan-pane", "1");
+      } else {
+        Array.from(chanSidebar.children).forEach(function (child) {
+          if (child !== guildsNav && !child.contains(guildsNav) && child.tagName !== "SECTION") {
+            child.setAttribute("data-dbc-chan-pane", "1");
+          }
+        });
+      }
+    } else if (chanListPane) {
+      chanListPane.setAttribute("data-dbc-chan-pane", "1");
+    } else if (chanSidebar) {
       chanSidebar.setAttribute("data-dbc-chan-pane", "1");
     }
 
@@ -562,15 +579,15 @@
       '  <div class="dbc-profile-avatar"><img src="https://cdn.discordapp.com/embed/avatars/0.png" alt="Avatar"/></div>' +
       '  <div class="dbc-profile-info">' +
       '    <div class="dbc-profile-name">Bot Client</div>' +
-      '    <div class="dbc-profile-tag">Trá»±c tuyáº¿n â€¢ Bot Client Web</div>' +
+      '    <div class="dbc-profile-tag">Trực tuyến • Bot Client Web</div>' +
       '  </div>' +
       '</div>' +
       '<div class="dbc-profile-actions">' +
-      '  <button type="button" class="dbc-profile-btn" id="dbc-btn-discohook" title="Má»Ÿ Discohook">' +
+      '  <button type="button" class="dbc-profile-btn" id="dbc-btn-discohook" title="Mở Discohook">' +
       '    <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2l2.4 7.2L22 12l-7.6 2.8L12 22l-2.4-7.2L2 12l7.6-2.8L12 2z"/></svg>' +
       '    <span>Discohook</span>' +
       '  </button>' +
-      '  <button type="button" class="dbc-profile-btn" id="dbc-btn-settings" title="CÃ i Ä‘áº·t">' +
+      '  <button type="button" class="dbc-profile-btn" id="dbc-btn-settings" title="Cài đặt">' +
       '    <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>' +
       '  </button>' +
       '</div>';
