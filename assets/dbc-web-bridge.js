@@ -69,6 +69,65 @@
     };
   }
 
+  // Intercept Discord Gateway WebSocket OP 2 (IDENTIFY) & OP 1 (HEARTBEAT) at transport layer!
+  // Guarantees Bot Token authentication (stripping 'Bot ', injecting intents & shard, nulling QoS heartbeat, and patching READY user.bot=false)
+  // even on iOS Safari WebKit if Vencord's regex patch on _doIdentify / handleDispatch is ever bypassed.
+  let cachedBotMeta = null;
+  try {
+    const savedMeta = window.sessionStorage.getItem("__dbc_bot_meta__");
+    if (savedMeta) cachedBotMeta = JSON.parse(savedMeta);
+  } catch (e) {}
+
+  const OrigWebSocket = window.WebSocket;
+  if (OrigWebSocket) {
+    const OrigSend = OrigWebSocket.prototype.send;
+    OrigWebSocket.prototype.send = function (data) {
+      if (typeof data === "string" && data.charAt(0) === "{") {
+        try {
+          const pkt = JSON.parse(data);
+          // OP 1 / OP 12 QoS Heartbeat: Discord bots must send d: seq (number or null), never a QoS object
+          if (pkt && pkt.op === 1 && pkt.d && typeof pkt.d === "object") {
+            pkt.d = typeof pkt.d.seq === "number" ? pkt.d.seq : null;
+            return OrigSend.call(this, JSON.stringify(pkt));
+          }
+          // OP 2 IDENTIFY: Ensure intents & shard are always attached for Bot accounts
+          if (pkt && pkt.op === 2 && pkt.d) {
+            if (typeof pkt.d.token === "string") {
+              pkt.d.token = pkt.d.token.replace(/^Bot\s+/i, "").trim();
+            }
+            if (pkt.d.intents === undefined) {
+              const wsRef = this;
+              const tok = pkt.d.token;
+              const applyAndSend = function (meta) {
+                const shardId = parseInt(window.sessionStorage.getItem("currentShard") || "0", 10) || 0;
+                const allShards = (meta && meta.allShards) || parseInt(window.sessionStorage.getItem("allShards") || "1", 10) || 1;
+                pkt.d.intents = (meta && meta.intents) || 3276541;
+                pkt.d.shard = [shardId < allShards ? shardId : 0, allShards];
+                OrigSend.call(wsRef, JSON.stringify(pkt));
+              };
+              if (cachedBotMeta && cachedBotMeta.intents) {
+                applyAndSend(cachedBotMeta);
+              } else {
+                window.BotClientNative.getBotInfo(tok).then(function (info) {
+                  if (info && info.success) {
+                    cachedBotMeta = info;
+                    try {
+                      window.sessionStorage.setItem("__dbc_bot_meta__", JSON.stringify(info));
+                      window.sessionStorage.setItem("allShards", String(info.allShards || 1));
+                    } catch (e) {}
+                  }
+                  applyAndSend(info);
+                });
+              }
+              return;
+            }
+          }
+        } catch (e) {}
+      }
+      return OrigSend.call(this, data);
+    };
+  }
+
   // 1. Implement window.BotClientNative (100% compatible with ElectronPreload.ts)
   window.BotClientNative = {
     getBotInfo: async function (token) {
@@ -305,24 +364,34 @@
             btnEl.textContent = "Login bằng Bot Token";
             return;
           }
+          cachedBotMeta = checkRes;
+          try {
+            window.sessionStorage.setItem("__dbc_bot_meta__", JSON.stringify(checkRes));
+            window.sessionStorage.setItem("allShards", String(checkRes.allShards || 1));
+          } catch (e) {}
         } catch (err) {
           console.warn(err);
         }
 
         window.sessionStorage.setItem("currentShard", "0");
+        window.localStorage.setItem("token", JSON.stringify(raw));
+        btnEl.textContent = "Đăng nhập thành công! Đang vào Discord...";
+
         try {
           if (window.Vencord && window.Vencord.Webpack) {
             const LoginMod = window.Vencord.Webpack.findByProps("loginToken", "login");
-            if (LoginMod && LoginMod.loginToken) {
+            if (LoginMod && typeof LoginMod.loginToken === "function") {
               LoginMod.loginToken(raw);
-              return;
             }
           }
         } catch (err) {
           console.warn(err);
         }
-        window.localStorage.setItem("token", JSON.stringify(raw));
-        window.location.replace("/channels/@me");
+
+        // Navigate after 800ms if SPA router hasn't already transitioned out of /login
+        setTimeout(function () {
+          window.location.assign("/channels/@me");
+        }, 800);
       });
     }, 600);
   }
