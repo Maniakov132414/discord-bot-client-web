@@ -14,6 +14,7 @@
   --dbc-safe-bottom: env(safe-area-inset-bottom, 0px);
   --dbc-rail-width: 72px;
   --dbc-profile-bar-h: 56px;
+  --custom-app-top-bar-height: 0px !important;
 }
 
 /* ============================================================================
@@ -70,6 +71,8 @@ textarea,
   max-width: 100vw !important;
   height: 100% !important;
   max-height: 100% !important;
+  margin: 0 !important;
+  padding: 0 !important;
   overflow: hidden !important;
   position: relative !important;
 }
@@ -79,7 +82,11 @@ textarea,
   display: flex !important;
   flex-direction: row !important;
   flex: 1 1 auto !important;
+  width: 100vw !important;
+  max-width: 100vw !important;
   height: 100% !important;
+  margin: 0 !important;
+  padding: 0 !important;
   overflow: hidden !important;
   position: relative !important;
 }
@@ -174,12 +181,19 @@ body.dbc-page-login button[type="submit"],
 body.dbc-mode-nav [data-dbc-drawer="unified"] {
   display: flex !important;
   flex-direction: row !important;
+  align-items: stretch !important;
+  justify-content: flex-start !important;
+  gap: 0 !important;
   width: 100vw !important;
   min-width: 100vw !important;
   max-width: 100vw !important;
   height: 100% !important;
   margin: 0 !important;
   padding: 0 !important;
+  left: 0 !important;
+  right: 0 !important;
+  top: 0 !important;
+  transform: none !important;
   overflow: hidden !important;
   position: relative !important;
   z-index: 90 !important;
@@ -189,18 +203,22 @@ body.dbc-mode-nav [data-dbc-drawer="unified"] {
 body.dbc-mode-nav [data-dbc-guilds-rail="1"],
 body.dbc-mode-nav nav[class*="guilds_"] {
   display: flex !important;
+  position: relative !important;
+  left: 0 !important;
+  top: 0 !important;
+  margin: 0 !important;
   width: var(--dbc-rail-width) !important;
   min-width: var(--dbc-rail-width) !important;
   max-width: var(--dbc-rail-width) !important;
   height: 100% !important;
-  flex-shrink: 0 !important;
+  flex: 0 0 var(--dbc-rail-width) !important;
   background: #111214 !important;
   overflow-y: auto !important;
   overflow-x: hidden !important;
   -webkit-overflow-scrolling: touch;
-  padding-top: var(--dbc-safe-top) !important;
-  padding-bottom: calc(var(--dbc-profile-bar-h) + var(--dbc-safe-bottom) + 8px) !important;
+  padding: var(--dbc-safe-top) 0 calc(var(--dbc-profile-bar-h) + var(--dbc-safe-bottom) + 8px) 0 !important;
   box-sizing: border-box !important;
+  transform: none !important;
   z-index: 100 !important;
 }
 
@@ -209,6 +227,10 @@ body.dbc-mode-nav [data-dbc-chan-pane="1"],
 body.dbc-mode-nav [class*="sidebarList_"] {
   display: flex !important;
   flex-direction: column !important;
+  position: relative !important;
+  left: 0 !important;
+  top: 0 !important;
+  margin: 0 !important;
   flex: 1 1 auto !important;
   width: calc(100vw - var(--dbc-rail-width)) !important;
   min-width: calc(100vw - var(--dbc-rail-width)) !important;
@@ -216,12 +238,13 @@ body.dbc-mode-nav [class*="sidebarList_"] {
   height: 100% !important;
   background: #1e1f22 !important;
   border-top-left-radius: 16px !important;
+  border: none !important;
   overflow-y: auto !important;
   overflow-x: hidden !important;
   -webkit-overflow-scrolling: touch;
-  padding-top: var(--dbc-safe-top) !important;
-  padding-bottom: calc(var(--dbc-profile-bar-h) + var(--dbc-safe-bottom) + 8px) !important;
+  padding: var(--dbc-safe-top) 0 calc(var(--dbc-profile-bar-h) + var(--dbc-safe-bottom) + 8px) 0 !important;
   box-sizing: border-box !important;
+  transform: none !important;
   z-index: 90 !important;
 }
 

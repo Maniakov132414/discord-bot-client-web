@@ -508,12 +508,29 @@
         avatarUrl = "https://cdn.discordapp.com/avatars/" + meta.botUser.id + "/" + meta.botUser.avatar + ".png?size=64";
       }
     } else {
-      var userPanel = document.querySelector('section[aria-label*="User"], section[class*="panels_"]');
-      if (userPanel) {
-        var img = userPanel.querySelector("img");
-        if (img && img.src) avatarUrl = img.src;
-        var nameEl = userPanel.querySelector('[class*="nameTag_"], [class*="title_"]');
-        if (nameEl && nameEl.textContent) username = nameEl.textContent.trim();
+      var foundUser = false;
+      try {
+        if (window.Vencord && window.Vencord.Webpack && window.Vencord.Webpack.Common && window.Vencord.Webpack.Common.UserStore) {
+          var u = window.Vencord.Webpack.Common.UserStore.getCurrentUser();
+          if (u) {
+            username = u.globalName || u.username || "Bot";
+            if (typeof u.getAvatarURL === "function") {
+              avatarUrl = u.getAvatarURL(null, 64, false);
+            } else if (u.avatar) {
+              avatarUrl = "https://cdn.discordapp.com/avatars/" + u.id + "/" + u.avatar + ".png?size=64";
+            }
+            foundUser = true;
+          }
+        }
+      } catch (e) {}
+      if (!foundUser) {
+        var userPanel = document.querySelector('section[aria-label*="User"], section[class*="panels_"]');
+        if (userPanel) {
+          var img = userPanel.querySelector("img");
+          if (img && img.src) avatarUrl = img.src;
+          var nameEl = userPanel.querySelector('[class*="nameTag_"], [class*="title_"]');
+          if (nameEl && nameEl.textContent) username = nameEl.textContent.trim();
+        }
       }
     }
 
