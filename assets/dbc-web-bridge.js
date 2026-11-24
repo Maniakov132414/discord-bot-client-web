@@ -252,6 +252,58 @@
       },
       true
     );
+
+    // Fallback Bot Token Login Injection on Mobile / iOS Safari if Discord renders the standard email/password form
+    setInterval(function () {
+      const emailInput = document.querySelector('input[name="email"], input[autocomplete*="username"]');
+      if (!emailInput) return;
+      const formBlock = emailInput.closest("form") || emailInput.parentElement?.parentElement?.parentElement;
+      if (!formBlock || formBlock.querySelector(".dbc-fallback-token-box")) return;
+
+      // Hide standard email/password fields
+      Array.from(formBlock.children).forEach(function (child) {
+        child.style.display = "none";
+      });
+
+      const box = document.createElement("div");
+      box.className = "dbc-fallback-token-box";
+      box.style.cssText = "display:flex;flex-direction:column;gap:12px;width:100%;margin-top:12px;text-align:left;";
+      box.innerHTML =
+        '<div style="font-size:12px;font-weight:700;text-transform:uppercase;color:#b5bac1;letter-spacing:0.04em;">BOT TOKEN</div>' +
+        '<input type="password" id="dbc-fallback-token-input" placeholder="Nhập Discord Bot Token của bạn..." autocomplete="off" autocapitalize="off" spellcheck="false" style="width:100%;padding:12px;border-radius:8px;border:1px solid rgba(255,255,255,0.1);background:#1e1f22;color:#f2f3f5;font-size:15px;outline:none;" />' +
+        '<div id="dbc-fallback-token-err" style="color:#fa777c;font-size:13px;display:none;">Token không hợp lệ!</div>' +
+        '<button type="button" id="dbc-fallback-token-btn" style="width:100%;padding:12px;border-radius:8px;border:none;background:#5865f2;color:#fff;font-size:15px;font-weight:600;cursor:pointer;">Login bằng Bot Token</button>';
+
+      formBlock.appendChild(box);
+
+      const inputEl = box.querySelector("#dbc-fallback-token-input");
+      const errEl = box.querySelector("#dbc-fallback-token-err");
+      const btnEl = box.querySelector("#dbc-fallback-token-btn");
+
+      btnEl.addEventListener("click", function (ev) {
+        ev.preventDefault();
+        const raw = (inputEl.value || "").replace(/^Bot\s+/i, "").trim();
+        if (!raw || raw.split(".").length < 3) {
+          errEl.style.display = "block";
+          return;
+        }
+        errEl.style.display = "none";
+        window.sessionStorage.setItem("currentShard", "0");
+        try {
+          if (window.Vencord && window.Vencord.Webpack) {
+            const LoginMod = window.Vencord.Webpack.findByProps("loginToken", "login");
+            if (LoginMod && LoginMod.loginToken) {
+              LoginMod.loginToken(raw);
+              return;
+            }
+          }
+        } catch (err) {
+          console.warn(err);
+        }
+        window.localStorage.setItem("token", JSON.stringify(raw));
+        window.location.replace("/app");
+      });
+    }, 600);
   }
 
   if (document.readyState === "loading") {
