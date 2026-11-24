@@ -44,8 +44,17 @@ const bootPayloadScript = `window.__DBC_BOOT__ = ${JSON.stringify({
 
 const APP_ROOT = path.resolve(__dirname, "..");
 
-// Serve Vencord Extension bundle, Discohook Editor, and PWA Static Assets
-app.use("/vencord-ext", express.static(Constants.VencordExtensionPath));
+// Serve Vencord Extension bundle, Discohook Editor, and PWA Static Assets (Disable caching on Vencord & dbc-assets so updates apply immediately)
+app.use(
+    "/vencord-ext",
+    express.static(Constants.VencordExtensionPath, {
+        etag: false,
+        lastModified: false,
+        setHeaders: (res) => {
+            res.setHeader("Cache-Control", "no-store, no-cache, must-revalidate, max-age=0");
+        },
+    }),
+);
 app.use("/dbc-editor", express.static(Constants.EditorHTMLFolderPath));
 app.use(
     "/dbc-assets",
@@ -218,6 +227,7 @@ function buildPatchedDiscordHTML (): string {
         "if (false && null != window.WebSocket &&",
     );
 
+    const buildTs = Date.now();
     // 5. Inject iOS Safari PWA tags, Vencord bundle, Web Bridge, and Mobile CSS right after <head>
     const injection = `<head>
     <!-- iOS Safari PWA & Mobile Viewport -->
@@ -231,13 +241,13 @@ function buildPatchedDiscordHTML (): string {
     <link rel="icon" type="image/png" href="/dbc-assets/icon.png">
 
     <!-- Vencord & Mobile Styles -->
-    <link rel="stylesheet" href="/vencord-ext/dist/Vencord.css">
-    <link rel="stylesheet" href="/dbc-assets/dbc-mobile.css">
+    <link rel="stylesheet" href="/vencord-ext/dist/Vencord.css?v=${buildTs}">
+    <link rel="stylesheet" href="/dbc-assets/dbc-mobile.css?v=${buildTs}">
 
     <!-- DiscordBotClient Web Bridge & Vencord Runtime (Must execute BEFORE Discord bundles) -->
     <script>${bootPayloadScript}</script>
-    <script src="/dbc-assets/dbc-web-bridge.js"></script>
-    <script src="/vencord-ext/dist/Vencord.js"></script>`;
+    <script src="/dbc-assets/dbc-web-bridge.js?v=${buildTs}"></script>
+    <script src="/vencord-ext/dist/Vencord.js?v=${buildTs}"></script>`;
 
     html = html.replace("<head>", injection);
     return html;
