@@ -119,162 +119,55 @@
     };
   }
 
-  function isBotClientPluginActive() {
-    try {
-      return !!(
-        window.Vencord &&
-        window.Vencord.Plugins &&
-        window.Vencord.Plugins.plugins &&
-        window.Vencord.Plugins.plugins.BotClient &&
-        window.Vencord.Plugins.plugins.BotClient.started
-      );
-    } catch (e) {
-      return false;
-    }
-  }
-
   var cachedBotMeta = null;
   try {
     var savedMeta = safeGetSession("__dbc_bot_meta__");
     if (savedMeta) cachedBotMeta = JSON.parse(savedMeta);
   } catch (e) {}
 
-  function patchReadyDispatchPayload(pkt) {
-    if (!pkt || pkt.op !== 0 || pkt.t !== "READY" || !pkt.d || !pkt.d.user) return pkt;
-    // IMPORTANT: If Vencord's BotClient plugin IS active, it patches `e.user.bot ? LOGOUT` to `!e.user.bot ? LOGOUT`
-    // and handles READY itself in handleDispatchPatch, so we MUST NOT touch READY when BotClient is active!
-    if (isBotClientPluginActive()) return pkt;
-
-    var d = pkt.d;
-    d.user.bot = false;
-    d.user.premium = true;
-    d.user.premium_type = 2;
-    d.user.mfa_enabled = 1;
-    d.user.purchased_flags = 3;
-    d.user.phone = "33550336";
-    d.user.verified = true;
-    d.user.mobile = true;
-    d.user.desktop = true;
-    d.user.nsfw_allowed = true;
-    d.user.email = d.user.id + "@cyrene.moe";
-    d.user.age_verification_status = 3;
-    d.sessions = d.sessions || [];
-    d.relationships = d.relationships || [];
-    d.connected_accounts = d.connected_accounts || [];
-    d.broadcaster_user_ids = d.broadcaster_user_ids || [];
-    d.linked_users = d.linked_users || [];
-    d.guild_join_requests = d.guild_join_requests || [];
-    d.tutorial = null;
-    d.pending_payments = null;
-    d.analytics_token = null;
-    d.explicit_content_scan_version = 4;
-    d.friend_suggestion_count = 0;
-    d.api_code_version = 1;
-    d.ad_personalization_toggles_disabled = true;
-    d.read_state = d.read_state || { version: 0, partial: false, entries: [] };
-    d.auth = d.auth || { authenticator_types: [2, 3] };
-    d.consents = d.consents || { personalization: { consented: false } };
-    d.notification_settings = d.notification_settings || { flags: 0 };
-    d.user_guild_settings = d.user_guild_settings || { entries: [], version: 0, partial: false };
-    d.regional_feature_config = d.regional_feature_config || { age_gated_features: 0, teen_by_default_settings: 0 };
-    d.country_code = "US";
-    d.subdivision_code = "CA";
-    var defChannel = window.BotClientNative.getPrivateChannelDefault();
-    d.private_channels = d.private_channels && d.private_channels.length ? d.private_channels : [defChannel];
-    d.guild_experiments = d.guild_experiments || window.BotClientNative.getGuildExperiments();
-    d.experiments = d.experiments || window.BotClientNative.getUserExperiments([], d.user.id);
-    d.apex_experiments = d.apex_experiments || window.BotClientNative.getApexExperiments(d.user.id);
-    d.auth_session_id_hash = btoa("aiko-chan-ai/DiscordBotClient");
-    d.static_client_session_id = window.crypto && window.crypto.randomUUID ? window.crypto.randomUUID() : "dbc-session";
-    d.users = [defChannel.recipients[0]].concat(d.users || []);
-    return pkt;
-  }
-
+  // Safe outgoing-only Gateway send guard:
+  // NEVER wrap new WebSocket() or strip &compress=zlib-stream because Discord's ZlibCompressionHandler
+  // requires zlib-stream binary frames, and Vencord's BotClient plugin patches _doIdentify, _sendHeartbeat,
+  // _handleDispatch (READY), and !e.user.bot ? LOGOUT directly inside Webpack!
   var OrigWebSocket = window.WebSocket;
-  if (OrigWebSocket) {
-    function PatchedWebSocket(url, protocols) {
-      // Only strip stream compression if Vencord BotClient is NOT active (fallback mode)
-      if (!isBotClientPluginActive() && typeof url === "string" && url.indexOf("gateway.discord.gg") !== -1) {
-        url = url.replace("&compress=zlib-stream", "").replace("&compress=zstd-stream", "");
-      }
-      var ws = protocols !== undefined ? new OrigWebSocket(url, protocols) : new OrigWebSocket(url);
-
-      if (!isBotClientPluginActive()) {
-        var userOnMessage = null;
-        Object.defineProperty(ws, "onmessage", {
-          configurable: true,
-          enumerable: true,
-          get: function () {
-            return userOnMessage;
-          },
-          set: function (fn) {
-            userOnMessage = fn;
-            if (typeof fn !== "function") return;
-            OrigWebSocket.prototype.addEventListener.call(ws, "message", function (ev) {
-              if (!isBotClientPluginActive() && typeof ev.data === "string" && ev.data.indexOf('"READY"') !== -1) {
-                try {
-                  var parsed = JSON.parse(ev.data);
-                  if (parsed && parsed.t === "READY") {
-                    var patched = JSON.stringify(patchReadyDispatchPayload(parsed));
-                    var syntheticEv = new MessageEvent("message", { data: patched });
-                    return fn.call(ws, syntheticEv);
-                  }
-                } catch (e) {}
-              }
-              return fn.call(ws, ev);
-            });
-          },
-        });
-      }
-
-      return ws;
-    }
-    PatchedWebSocket.prototype = OrigWebSocket.prototype;
-    PatchedWebSocket.CONNECTING = OrigWebSocket.CONNECTING;
-    PatchedWebSocket.OPEN = OrigWebSocket.OPEN;
-    PatchedWebSocket.CLOSING = OrigWebSocket.CLOSING;
-    PatchedWebSocket.CLOSED = OrigWebSocket.CLOSED;
-    window.WebSocket = PatchedWebSocket;
-
+  if (OrigWebSocket && OrigWebSocket.prototype) {
     var OrigSend = OrigWebSocket.prototype.send;
     OrigWebSocket.prototype.send = function (data) {
       if (typeof data === "string" && data.charAt(0) === "{") {
         try {
           var pkt = JSON.parse(data);
-          // OP 1 QoS Heartbeat: bots only accept number or null
-          if (pkt && pkt.op === 1 && pkt.d && typeof pkt.d === "object") {
+          // OP 1 QoS Heartbeat safety net: bots only accept sequence number or null (never QoS object)
+          if (pkt && pkt.op === 1 && pkt.d !== null && typeof pkt.d === "object") {
             pkt.d = typeof pkt.d.seq === "number" ? pkt.d.seq : null;
             return OrigSend.call(this, JSON.stringify(pkt));
           }
-          // OP 2 IDENTIFY fallback if Vencord's _doIdentify didn't attach intents
-          if (pkt && pkt.op === 2 && pkt.d) {
+          // OP 2 IDENTIFY safety net (only runs if Vencord's _doIdentify didn't already set pkt.d.intents)
+          if (pkt && pkt.op === 2 && pkt.d && pkt.d.intents === undefined) {
             if (typeof pkt.d.token === "string") {
               pkt.d.token = pkt.d.token.replace(/^Bot\s+/i, "").trim();
             }
-            if (pkt.d.intents === undefined) {
-              var wsRef = this;
-              var tok = pkt.d.token;
-              var applyAndSend = function (meta) {
-                var shardId = parseInt(safeGetSession("currentShard") || "0", 10) || 0;
-                var allShards = (meta && meta.allShards) || parseInt(safeGetSession("allShards") || "1", 10) || 1;
-                pkt.d.intents = (meta && meta.intents) || 3276541;
-                pkt.d.shard = [shardId < allShards ? shardId : 0, allShards];
-                OrigSend.call(wsRef, JSON.stringify(pkt));
-              };
-              if (cachedBotMeta && cachedBotMeta.intents) {
-                applyAndSend(cachedBotMeta);
-              } else {
-                window.BotClientNative.getBotInfo(tok).then(function (info) {
-                  if (info && info.success) {
-                    cachedBotMeta = info;
-                    safeSetSession("__dbc_bot_meta__", JSON.stringify(info));
-                    safeSetSession("allShards", String(info.allShards || 1));
-                  }
-                  applyAndSend(info);
-                });
-              }
-              return;
+            var wsRef = this;
+            var tok = pkt.d.token;
+            var applyAndSend = function (meta) {
+              var shardId = parseInt(safeGetSession("currentShard") || "0", 10) || 0;
+              var allShards = (meta && meta.allShards) || parseInt(safeGetSession("allShards") || "1", 10) || 1;
+              pkt.d.intents = (meta && meta.intents) || 3276541;
+              pkt.d.shard = [shardId < allShards ? shardId : 0, allShards];
+              OrigSend.call(wsRef, JSON.stringify(pkt));
+            };
+            if (cachedBotMeta && cachedBotMeta.intents) {
+              applyAndSend(cachedBotMeta);
+            } else {
+              window.BotClientNative.getBotInfo(tok).then(function (info) {
+                if (info && info.success) {
+                  cachedBotMeta = info;
+                  safeSetSession("__dbc_bot_meta__", JSON.stringify(info));
+                  safeSetSession("allShards", String(info.allShards || 1));
+                }
+                applyAndSend(info);
+              });
             }
+            return;
           }
         } catch (e) {}
       }

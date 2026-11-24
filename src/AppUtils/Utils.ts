@@ -130,9 +130,13 @@ export default class Util {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         callback: (rq: express.Request<any, any, any, any>, rs: express.Response) => unknown,
     ) {
-        let data = "";
+        const contentType = (req.headers["content-type"] || "").toLowerCase();
         // check content-type
-        if (req.headers["content-type"] !== "application/json") {
+        if (!contentType.includes("application/json")) {
+            // If Vercel already pre-parsed non-JSON body onto req.body and consumed stream, avoid hanging
+            if (req.readableEnded && req.body !== undefined && !Buffer.isBuffer(req.body)) {
+                return callback(req, res);
+            }
             return multer().any()(req, res, function (err) {
                 if (err) {
                     console.error("Multer Error:", err);
@@ -140,6 +144,39 @@ export default class Util {
                 callback(req, res);
             });
         }
+
+        // Handle pre-buffered / pre-parsed body on serverless runtimes (e.g. @vercel/node)
+        if (Buffer.isBuffer(req.body)) {
+            const rawStr = req.body.toString("utf8");
+            req.rawBody = rawStr;
+            try {
+                req.body = rawStr ? JSON.parse(rawStr) : undefined;
+            } catch (e) {
+                req.body = undefined;
+                console.error("JSON Parse Error:", e);
+            }
+            return callback(req, res);
+        }
+        if (typeof req.body === "string") {
+            req.rawBody = req.body;
+            try {
+                req.body = req.body ? JSON.parse(req.body) : undefined;
+            } catch (e) {
+                req.body = undefined;
+                console.error("JSON Parse Error:", e);
+            }
+            return callback(req, res);
+        }
+        if (req.body !== undefined && typeof req.body === "object" && req.body !== null) {
+            req.rawBody = JSON.stringify(req.body);
+            return callback(req, res);
+        }
+        if (req.readableEnded) {
+            req.rawBody = "";
+            return callback(req, res);
+        }
+
+        let data = "";
         req.on("data", function (chunk) {
             data += chunk;
         });
@@ -207,81 +244,92 @@ export default class Util {
         return false;
     }
     static async proxy (req: express.Request, res: express.Response) {
-        // 1. Create Electron request
-        const electronReq = net.request({
-            method: req.method as string,
-            url: `https://canary.discord.com${req.originalUrl}`,
-            redirect: "manual",
-            useSessionCookies: true,
-        });
+        void net;
+        try {
+            const targetUrl = `https://canary.discord.com${req.originalUrl}`;
 
-        // 2. Copy headers (Express -> Electron)
-        const skipHeaders = [
-            "host",
-            "connection",
-            "content-length",
-            "transfer-encoding",
-            "upgrade",
-            "origin",
-            "cookie",
-            "referer",
-        ];
+            // 1. Copy headers (Express -> Fetch)
+            const skipHeaders = [
+                "host",
+                "connection",
+                "content-length",
+                "transfer-encoding",
+                "upgrade",
+                "origin",
+                "cookie",
+                "referer",
+                "accept-encoding",
+            ];
 
-        Object.entries(req.headers).forEach(([key, value]) => {
-            const lowerKey = key.toLowerCase();
-            if (value && !skipHeaders.includes(lowerKey) && !lowerKey.startsWith("sec-")) {
-                try {
-                    const headerValue = Array.isArray(value) ? value.join(", ") : value;
-                    electronReq.setHeader(key, headerValue);
-                } catch {
-                    // invalid header value, skip it
+            const outHeaders: Record<string, string> = {};
+            Object.entries(req.headers).forEach(([key, value]) => {
+                const lowerKey = key.toLowerCase();
+                if (value && !skipHeaders.includes(lowerKey) && !lowerKey.startsWith("sec-")) {
+                    outHeaders[key] = Array.isArray(value) ? value.join(", ") : String(value);
+                }
+            });
+
+            outHeaders["Origin"] = "https://discord.com";
+            outHeaders["Referer"] = "https://discord.com/";
+
+            // 2. Safely read request body across both standard Node streams and Vercel serverless pre-buffered requests
+            const method = req.method.toUpperCase();
+            const canHaveBody = ["POST", "PUT", "PATCH", "DELETE"].includes(method);
+            let bodyBuffer: Buffer | undefined;
+
+            if (canHaveBody) {
+                if (Buffer.isBuffer(req.body)) {
+                    bodyBuffer = req.body;
+                } else if (typeof req.body === "string") {
+                    bodyBuffer = Buffer.from(req.body, "utf8");
+                } else if (typeof req.rawBody === "string" && req.rawBody.length > 0) {
+                    bodyBuffer = Buffer.from(req.rawBody, "utf8");
+                } else if (req.body !== undefined && typeof req.body === "object" && req.body !== null) {
+                    bodyBuffer = Buffer.from(JSON.stringify(req.body), "utf8");
+                } else if (
+                    !req.readableEnded &&
+                    (parseInt((req.headers["content-length"] as string) ?? "0", 10) > 0 ||
+                        Boolean(req.headers["transfer-encoding"]))
+                ) {
+                    const chunks: Buffer[] = [];
+                    for await (const chunk of req) {
+                        chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
+                    }
+                    if (chunks.length > 0) {
+                        bodyBuffer = Buffer.concat(chunks);
+                    }
                 }
             }
-        });
 
-        // 3. Origin & Referer
-        electronReq.setHeader("Origin", "https://discord.com");
-        electronReq.setHeader("Referer", "https://discord.com/");
+            const upstreamRes = await fetch(targetUrl, {
+                method,
+                headers: outHeaders,
+                body: bodyBuffer && bodyBuffer.length > 0 ? new Uint8Array(bodyBuffer) : undefined,
+                redirect: "manual",
+            });
 
-        // 4. Handle request body for methods that typically have a body
-        const hasBody = ["POST", "PUT", "PATCH", "DELETE"].includes(req.method.toUpperCase());
-        if (hasBody && parseInt(req.headers["content-length"] as string ?? "0", 10) > 0) {
-            electronReq.chunkedEncoding = true;
-        }
+            res.status(upstreamRes.status);
 
-        // 5. Electron -> Express
-        electronReq.on("response", electronRes => {
-            res.status(electronRes.statusCode);
-            const skipResHeaders = ["content-length", "transfer-encoding"];
-            Object.entries(electronRes.headers).forEach(([key, value]) => {
-                if (value && !skipResHeaders.includes(key.toLowerCase())) {
+            // Node fetch automatically decompresses response body, so omit content-encoding & content-length
+            const skipResHeaders = ["content-encoding", "content-length", "transfer-encoding", "connection"];
+            upstreamRes.headers.forEach((value, key) => {
+                if (!skipResHeaders.includes(key.toLowerCase())) {
                     try {
                         res.setHeader(key, value);
                     } catch {
-                        //
+                        // ignore invalid header
                     }
                 }
             });
 
-            electronRes.on("data", chunk => res.write(chunk));
-            electronRes.on("end", () => res.end());
-            electronRes.on("error", err => {
-                console.error("Proxy response error:", err);
-                if (!res.headersSent) res.status(500).end();
-            });
-        });
-
-        electronReq.on("error", err => {
+            const resBuf = Buffer.from(await upstreamRes.arrayBuffer());
+            return res.send(resBuf);
+        } catch (err: unknown) {
+            const msg = err instanceof Error ? err.message : String(err);
             console.error("Proxy request error:", err);
-            if (!res.headersSent) res.status(502).send({ error: err.message });
-        });
-
-        // 6. Pipe request body (Express -> Electron)
-        if (hasBody) {
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            req.pipe(electronReq as any);
-        } else {
-            electronReq.end();
+            if (!res.headersSent) {
+                return res.status(502).send({ error: msg });
+            }
         }
     }
     static generateSelfSignedCertificate () {
