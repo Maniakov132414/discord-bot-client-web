@@ -14,9 +14,9 @@
   "main": "build/web-server.js",
   "scripts": {
     "start": "node build/web-server.js",
-    "build": "tsc && tsc-alias",
+    "build": "echo 'Using precompiled build/'",
     "build:web": "tsc && tsc-alias",
-    "vercel-build": "tsc && tsc-alias",
+    "vercel-build": "echo 'Using precompiled build/'",
     "test": "node --test tests/electron.test.cjs",
     "test:botclient": "node Vencord/src/userplugins/botClient/tests/run.cjs",
     "test:botclient:live": "node Vencord/src/userplugins/botClient/tests/check-discord-patches.cjs",
