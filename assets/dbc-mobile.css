@@ -36,14 +36,14 @@ body,
   user-select: none;
 }
 
-/* Ensure app wrapper hierarchy never collapses or centers */
+/* Ensure ONLY top-level app wrapper hierarchy never collapses or centers (never touch toasts/modals!) */
 #app-mount > div,
-[class*="appAsidePanelWrapper_"],
-[class*="notAppAsidePanel_"],
-[class*="app_"],
-[class*="layers_"],
-[class*="layer_"],
-[class*="container_"] {
+#app-mount > [class*="appAsidePanelWrapper_"],
+#app-mount [class*="notAppAsidePanel_"],
+#app-mount [class*="notAppAsidePanel_"] > [class*="app_"],
+#app-mount [class*="app_"] > [class*="layers_"],
+#app-mount [class*="layers_"] > [class*="layer_"],
+#app-mount [class*="layer_"] > [class*="container_"] {
   width: 100vw !important;
   max-width: 100vw !important;
   height: 100% !important;
@@ -54,7 +54,7 @@ body,
 }
 
 /* The outer Discord layout container: flex row */
-[class*="base_"] {
+#app-mount [class*="base_"] {
   display: flex !important;
   flex-direction: row !important;
   width: 100vw !important;
@@ -66,7 +66,7 @@ body,
 }
 
 /* Content container holding sidebar + chat */
-[class*="content_"]:not([class*="chatContent_"]):not([class*="messageContent_"]) {
+#app-mount [class*="base_"] > [class*="content_"] {
   display: flex !important;
   flex-direction: row !important;
   flex: 1 1 auto !important;
