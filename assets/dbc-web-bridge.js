@@ -1,4 +1,4 @@
-/**
+﻿/**
  * DiscordBotClient Web Bridge (Replaces ElectronPreload.ts & Chrome Extension Content Script)
  * Provides window.BotClientNative, window.protoAPI, Vencord CSS injection,
  * Discohook MessageChannel bridge, Storage preservation, Desktop UA spoofing for Discord React,
@@ -308,8 +308,8 @@
     discohookModal.className = "dbc-hidden";
     discohookModal.innerHTML =
       '<div id="dbc-discohook-header">' +
-      "<span>✨ Discohook & Components V2 Editor</span>" +
-      '<button type="button" id="dbc-discohook-close">Đóng</button>' +
+      "<span>âœ¨ Discohook & Components V2 Editor</span>" +
+      '<button type="button" id="dbc-discohook-close">ÄÃ³ng</button>' +
       "</div>" +
       '<iframe id="dbc-discohook-iframe" src="about:blank"></iframe>';
 
@@ -360,8 +360,49 @@
     }
   });
 
-  // 5. Native Discord Mobile App Layout Tagger & Navigation Controller
-  var initialDrawerAutoOpened = false;
+  // 5. Discord Native Mobile App Navigation Controller
+  // Replicates Discord Mobile UX:
+  // - Mode "nav": User is browsing servers and channel list / DMs list (Left Rail + Channel list visible side-by-side)
+  // - Mode "chat": User tapped a channel -> fullscreen chat view with Back Button (Ã¢â€  ) to return to channels
+  // - Mode "profile": Bottom profile strip with bot avatar, name, status, and quick settings
+
+  var currentMobileMode = "nav"; // "nav" or "chat"
+
+  function updateMobileMode() {
+    if (window.innerWidth > 820) {
+      document.body.classList.remove("dbc-mode-nav", "dbc-mode-chat", "dbc-members-open");
+      return;
+    }
+
+    var path = window.location.pathname;
+    // If on /channels/@me or /channels/:guildId without a specific active channel open, show nav
+    // When a channel is selected (/channels/@me/xxx or /channels/guildId/chanId), default to chat mode
+    // UNLESS the user explicitly tapped the Back button to view channels list
+    if (path === "/channels/@me" || path === "/app" || path === "/") {
+      setMobileMode("nav");
+    } else {
+      // It's a specific channel or guild
+      if (!sessionStorage.getItem("__dbc_mobile_nav_override__")) {
+        setMobileMode("chat");
+      } else {
+        setMobileMode("nav");
+      }
+    }
+  }
+
+  function setMobileMode(mode) {
+    currentMobileMode = mode;
+    if (mode === "nav") {
+      sessionStorage.setItem("__dbc_mobile_nav_override__", "1");
+      document.body.classList.remove("dbc-mode-chat");
+      document.body.classList.add("dbc-mode-nav");
+    } else {
+      sessionStorage.removeItem("__dbc_mobile_nav_override__");
+      document.body.classList.remove("dbc-mode-nav");
+      document.body.classList.add("dbc-mode-chat");
+    }
+    updateProfileStrip();
+  }
 
   function tagDiscordMobileLayout() {
     if (!document.body) return;
@@ -371,17 +412,11 @@
     document.body.classList.toggle("dbc-authenticated", isAuth);
 
     if (!isAuth) {
-      document.body.classList.remove("dbc-drawer-open", "dbc-members-open");
+      document.body.classList.remove("dbc-mode-nav", "dbc-mode-chat", "dbc-members-open");
       return;
     }
 
-    // Auto-open Server/Channel drawer once when first arriving on /channels/@me on mobile
-    if (!initialDrawerAutoOpened && window.innerWidth <= 820) {
-      initialDrawerAutoOpened = true;
-      if (window.location.pathname === "/channels/@me" || window.location.pathname === "/app" || window.location.pathname === "/") {
-        document.body.classList.add("dbc-drawer-open");
-      }
-    }
+    updateMobileMode();
 
     var guildsNav = guildsList.closest("nav") || guildsList.parentElement;
     var chanList = document.querySelector('[data-list-id="channels"], [data-list-id^="private-channels"]');
@@ -391,7 +426,7 @@
         ? document.querySelector('[data-list-id^="chat-messages"]').closest("section, div")
         : null);
 
-    // Identify unified left drawer vs split guilds + channels panes
+    // Identify rail, channel pane, and outer shell
     if (guildsNav && chanList) {
       var common = guildsNav.parentElement;
       while (common && common !== document.body && !common.contains(chanList)) {
@@ -410,14 +445,12 @@
               }
             });
           }
-          // Tag direct child of unified drawer that holds chanList
           var chanWrap = chanList;
           while (chanWrap && chanWrap.parentElement !== common) {
             chanWrap = chanWrap.parentElement;
           }
           if (chanWrap) chanWrap.setAttribute("data-dbc-chan-inner", "1");
         } else {
-          // common is the outer shell holding guildsNav + chanSidebar + mainContent
           common.setAttribute("data-dbc-shell", "1");
           var gTop = guildsNav;
           while (gTop && gTop.parentElement !== common) gTop = gTop.parentElement;
@@ -442,15 +475,20 @@
       }
     }
 
-    // Tag Channel Top Header Bar so channel title never overlaps the mobile menu button
+    // Tag Channel Header Bar
     if (mainEl) {
       var headerBar =
         mainEl.querySelector('section[aria-label]') ||
         (mainEl.firstElementChild && mainEl.firstElementChild.offsetHeight <= 64 ? mainEl.firstElementChild : null);
-      if (headerBar) headerBar.setAttribute("data-dbc-header-bar", "1");
+      if (headerBar) {
+        headerBar.setAttribute("data-dbc-header-bar", "1");
+        // Tag member toggle button inside header if present
+        var mBtn = headerBar.querySelector('[aria-label*="Member"], [aria-label*="ThÃƒÂ nh viÃƒÂªn"], [aria-label*="thÃƒÂ nh viÃƒÂªn"]');
+        if (mBtn) mBtn.setAttribute("data-dbc-member-toggle-btn", "1");
+      }
     }
 
-    // Tag Right-Hand Members / Profile Sidebar Pane
+    // Tag Right-Hand Members Sidebar Pane
     var membersList = document.querySelector('[data-list-id^="members-"]');
     if (membersList && mainEl) {
       var mPane = membersList;
@@ -462,17 +500,7 @@
       }
     }
 
-    // Hide Desktop Windows Titlebar on Mobile if present (height ~24-36px at very top above shell)
-    var shellEl = document.querySelector('[data-dbc-shell="1"]');
-    if (shellEl && shellEl.parentElement) {
-      Array.from(shellEl.parentElement.children).forEach(function (child) {
-        if (child !== shellEl && child.offsetHeight > 0 && child.offsetHeight <= 40 && !child.contains(guildsList)) {
-          child.setAttribute("data-dbc-desktop-titlebar", "1");
-        }
-      });
-    }
-
-    // Tag User Settings / Server Settings 2-column view for clean mobile drill-down
+    // Tag Settings Root
     var settingsTabList = document.querySelector('[role="tablist"][aria-orientation="vertical"]');
     if (settingsTabList) {
       var navRegion = settingsTabList;
@@ -491,156 +519,131 @@
       document.body.classList.remove("dbc-settings-content-focused");
     }
 
-    updateMobileTabActiveState();
+    updateProfileStrip();
   }
 
-  function updateMobileTabActiveState() {
-    var tabbar = document.getElementById("dbc-mobile-tabbar");
-    if (!tabbar) return;
-    var drawerOpen = document.body.classList.contains("dbc-drawer-open");
-    var membersOpen = document.body.classList.contains("dbc-members-open");
-    var isDm = window.location.pathname.indexOf("/channels/@me") === 0;
+  function updateProfileStrip() {
+    var strip = document.getElementById("dbc-profile-strip");
+    if (!strip) return;
 
-    var btns = tabbar.querySelectorAll(".dbc-tab-btn");
-    btns.forEach(function (b) {
-      b.classList.remove("dbc-active");
-    });
-    if (membersOpen) {
-      var mBtn = tabbar.querySelector('[data-tab="members"]');
-      if (mBtn) mBtn.classList.add("dbc-active");
-    } else if (drawerOpen && isDm) {
-      var dmBtn = tabbar.querySelector('[data-tab="dms"]');
-      if (dmBtn) dmBtn.classList.add("dbc-active");
-    } else if (drawerOpen) {
-      var sBtn = tabbar.querySelector('[data-tab="servers"]');
-      if (sBtn) sBtn.classList.add("dbc-active");
-    } else {
-      var cBtn = tabbar.querySelector('[data-tab="servers"]');
-      if (cBtn && !drawerOpen) cBtn.classList.remove("dbc-active");
+    // Try reading cached bot user metadata
+    var meta = cachedBotMeta;
+    if (!meta) {
+      try {
+        var stored = safeGetSession("__dbc_bot_meta__");
+        if (stored) meta = JSON.parse(stored);
+      } catch (e) {}
     }
+
+    var avatarUrl = "https://cdn.discordapp.com/embed/avatars/0.png";
+    var username = "Bot Client";
+    var botTag = "BOT";
+
+    if (meta && meta.botUser) {
+      username = meta.botUser.username || "Bot";
+      if (meta.botUser.avatar) {
+        avatarUrl = "https://cdn.discordapp.com/avatars/" + meta.botUser.id + "/" + meta.botUser.avatar + ".png?size=64";
+      }
+    } else {
+      // Try reading user info from Discord DOM if available
+      var userPanel = document.querySelector('section[aria-label*="User"], section[class*="panels_"]');
+      if (userPanel) {
+        var img = userPanel.querySelector("img");
+        if (img && img.src) avatarUrl = img.src;
+        var nameEl = userPanel.querySelector('[class*="nameTag_"], [class*="title_"]');
+        if (nameEl && nameEl.textContent) username = nameEl.textContent.trim();
+      }
+    }
+
+    var nameElNode = strip.querySelector(".dbc-profile-name");
+    var imgElNode = strip.querySelector(".dbc-profile-avatar img");
+    if (nameElNode && nameElNode.textContent !== username) nameElNode.textContent = username;
+    if (imgElNode && imgElNode.src !== avatarUrl) imgElNode.src = avatarUrl;
   }
 
   function openUserSettingsMobile() {
-    document.body.classList.remove("dbc-drawer-open", "dbc-members-open");
     try {
       if (window.Vencord && window.Vencord.Webpack && window.Vencord.Webpack.Common && window.Vencord.Webpack.Common.SettingsRouter) {
         window.Vencord.Webpack.Common.SettingsRouter.open("My Account");
         return;
       }
     } catch (e) {}
-    // Fallback: click Discord's User Settings gear button in the user panel
     var gearBtn = document.querySelector(
-      'button[aria-label*="Settings"], button[aria-label*="Cài đặt"], button[aria-label*="Thiết lập"]'
+      'button[aria-label*="Settings"], button[aria-label*="CÃƒÂ i Ã„â€˜Ã¡ÂºÂ·t"], button[aria-label*="ThiÃ¡ÂºÂ¿t lÃ¡ÂºÂ­p"]'
     );
     if (gearBtn) gearBtn.click();
   }
 
-  function navigateToDMsMobile() {
-    document.body.classList.remove("dbc-members-open");
-    document.body.classList.add("dbc-drawer-open");
-    try {
-      if (window.Vencord && window.Vencord.Webpack && window.Vencord.Webpack.Common && window.Vencord.Webpack.Common.NavigationRouter) {
-        window.Vencord.Webpack.Common.NavigationRouter.transitionTo("/channels/@me");
-        updateMobileTabActiveState();
-        return;
-      }
-    } catch (e) {}
-    var homeLink = document.querySelector('[data-list-item-id="guildsnav___home"], a[href="/channels/@me"]');
-    if (homeLink) homeLink.click();
-    updateMobileTabActiveState();
-  }
-
-  function toggleMembersDrawerMobile() {
-    document.body.classList.remove("dbc-drawer-open");
-    // Ensure Discord's Member List is actually toggled on in React if not yet mounted in DOM
-    if (!document.querySelector('[data-list-id^="members-"]')) {
-      var memberToggleBtn = document.querySelector(
-        '[data-dbc-header-bar="1"] [aria-label*="Member"], [data-dbc-header-bar="1"] [aria-label*="Thành viên"], [data-dbc-header-bar="1"] [aria-label*="thành viên"]'
-      );
-      if (memberToggleBtn) memberToggleBtn.click();
-    }
-    document.body.classList.toggle("dbc-members-open");
-    updateMobileTabActiveState();
-  }
-
   function initMobileUI() {
-    if (document.getElementById("dbc-mobile-nav-fab")) return;
+    if (document.getElementById("dbc-mobile-back-btn")) return;
 
-    // 1. Top-Left Drawer Menu Button
-    var fab = document.createElement("button");
-    fab.id = "dbc-mobile-nav-fab";
-    fab.type = "button";
-    fab.title = "Mở danh sách Server & Kênh";
-    fab.innerHTML =
-      '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><line x1="4" y1="6" x2="20" y2="6"/><line x1="4" y1="12" x2="20" y2="12"/><line x1="4" y1="18" x2="20" y2="18"/></svg>';
-    fab.addEventListener("click", function () {
+    // 1. Channel Chat Header Back Button (Ã¢â€  )
+    var backBtn = document.createElement("button");
+    backBtn.id = "dbc-mobile-back-btn";
+    backBtn.type = "button";
+    backBtn.title = "Quay lÃ¡ÂºÂ¡i danh sÃƒÂ¡ch kÃƒÂªnh";
+    backBtn.innerHTML =
+      '<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/></svg>';
+    backBtn.addEventListener("click", function (e) {
+      e.preventDefault();
+      e.stopPropagation();
+      setMobileMode("nav");
+    });
+    document.body.appendChild(backBtn);
+
+    // 2. Members Slide-over Backdrop
+    var membersBackdrop = document.createElement("div");
+    membersBackdrop.id = "dbc-members-backdrop";
+    membersBackdrop.addEventListener("click", function () {
       document.body.classList.remove("dbc-members-open");
-      document.body.classList.toggle("dbc-drawer-open");
-      updateMobileTabActiveState();
     });
-    document.body.appendChild(fab);
-
-    // 2. Frosted Backdrop Overlay
-    var backdrop = document.createElement("div");
-    backdrop.id = "dbc-mobile-backdrop";
-    backdrop.addEventListener("click", function () {
-      document.body.classList.remove("dbc-drawer-open", "dbc-members-open");
-      updateMobileTabActiveState();
-    });
-    document.body.appendChild(backdrop);
+    document.body.appendChild(membersBackdrop);
 
     // 3. Settings Mobile Back Button
     var settingsBackBtn = document.createElement("button");
     settingsBackBtn.id = "dbc-settings-back-btn";
     settingsBackBtn.type = "button";
-    settingsBackBtn.textContent = "← Danh mục Cài đặt";
+    settingsBackBtn.textContent = "Ã¢â€   Danh mÃ¡Â»Â¥c CÃƒÂ i Ã„â€˜Ã¡ÂºÂ·t";
     settingsBackBtn.addEventListener("click", function () {
       document.body.classList.remove("dbc-settings-content-focused");
     });
     document.body.appendChild(settingsBackBtn);
 
-    // 4. Native Discord Mobile Bottom Tab Bar
-    var tabbar = document.createElement("nav");
-    tabbar.id = "dbc-mobile-tabbar";
-    tabbar.innerHTML =
-      '<button type="button" class="dbc-tab-btn" data-tab="servers">' +
-      '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="7" height="7" rx="2"/><rect x="14" y="4" width="7" height="7" rx="2"/><rect x="3" y="13" width="7" height="7" rx="2"/><rect x="14" y="13" width="7" height="7" rx="2"/></svg>' +
-      "<span>Servers</span></button>" +
-      '<button type="button" class="dbc-tab-btn" data-tab="dms">' +
-      '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>' +
-      "<span>Tin nhắn</span></button>" +
-      '<button type="button" class="dbc-tab-btn" data-tab="members">' +
-      '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>' +
-      "<span>Thành viên</span></button>" +
-      '<button type="button" class="dbc-tab-btn" data-tab="discohook">' +
-      '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2l2.4 7.2L22 12l-7.6 2.8L12 22l-2.4-7.2L2 12l7.6-2.8L12 2z"/></svg>' +
-      "<span>Discohook</span></button>" +
-      '<button type="button" class="dbc-tab-btn" data-tab="settings">' +
-      '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>' +
-      "<span>Cài đặt</span></button>";
+    // 4. Discord Native Mobile Bottom Profile Bar (Across bottom in Nav Mode)
+    var profileStrip = document.createElement("div");
+    profileStrip.id = "dbc-profile-strip";
+    profileStrip.innerHTML =
+      '<div class="dbc-profile-inner">' +
+      '  <div class="dbc-profile-avatar"><img src="https://cdn.discordapp.com/embed/avatars/0.png" alt="Avatar"/></div>' +
+      '  <div class="dbc-profile-info">' +
+      '    <div class="dbc-profile-name">Bot Client</div>' +
+      '    <div class="dbc-profile-tag">TrÃ¡Â»Â±c tuyÃ¡ÂºÂ¿n Ã¢â‚¬Â¢ Bot Client Web</div>' +
+      '  </div>' +
+      '</div>' +
+      '<div class="dbc-profile-actions">' +
+      '  <button type="button" class="dbc-profile-btn" id="dbc-btn-discohook" title="MÃ¡Â»Å¸ Discohook">' +
+      '    <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2l2.4 7.2L22 12l-7.6 2.8L12 22l-2.4-7.2L2 12l7.6-2.8L12 2z"/></svg>' +
+      '    <span>Discohook</span>' +
+      '  </button>' +
+      '  <button type="button" class="dbc-profile-btn" id="dbc-btn-settings" title="CÃƒÂ i Ã„â€˜Ã¡ÂºÂ·t">' +
+      '    <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>' +
+      '  </button>' +
+      '</div>';
 
-    tabbar.addEventListener("click", function (ev) {
-      var btn = ev.target && ev.target.closest ? ev.target.closest(".dbc-tab-btn") : null;
-      if (!btn) return;
-      var tab = btn.getAttribute("data-tab");
-      if (tab === "servers") {
-        document.body.classList.remove("dbc-members-open");
-        document.body.classList.toggle("dbc-drawer-open");
-        updateMobileTabActiveState();
-      } else if (tab === "dms") {
-        navigateToDMsMobile();
-      } else if (tab === "members") {
-        toggleMembersDrawerMobile();
-      } else if (tab === "discohook") {
-        document.body.classList.remove("dbc-drawer-open", "dbc-members-open");
-        triggerOpenDiscohookForCurrentChannel();
-      } else if (tab === "settings") {
-        openUserSettingsMobile();
-      }
+    profileStrip.querySelector(".dbc-profile-inner").addEventListener("click", function () {
+      openUserSettingsMobile();
     });
-    document.body.appendChild(tabbar);
+    profileStrip.querySelector("#dbc-btn-discohook").addEventListener("click", function (e) {
+      e.stopPropagation();
+      triggerOpenDiscohookForCurrentChannel();
+    });
+    profileStrip.querySelector("#dbc-btn-settings").addEventListener("click", function (e) {
+      e.stopPropagation();
+      openUserSettingsMobile();
+    });
+    document.body.appendChild(profileStrip);
 
-    // 5. Auto-close drawer when tapping a specific Channel or DM item; focus content on Settings tab tap
+    // 5. Click Interceptor: Tapping a channel opens Chat mode; Tapping a server stays in Nav mode!
     document.addEventListener(
       "click",
       function (e) {
@@ -648,7 +651,7 @@
         var target = e.target;
         if (!target || !target.closest) return;
 
-        // Settings vertical tab click -> drill down to content view
+        // Settings tab click -> drill down
         var settingsTab = target.closest('[data-dbc-settings-nav="1"] [role="tab"]');
         if (settingsTab) {
           setTimeout(function () {
@@ -657,30 +660,47 @@
           return;
         }
 
-        // Channel / DM item click (ignore Server icon clicks inside guildsnav so user can pick a channel in that server!)
-        if (target.closest('[data-list-id="guildsnav"]')) return;
+        // Server icon click (inside guildsnav): STAY IN NAV MODE! So user sees channels list for that server!
+        if (target.closest('[data-list-id="guildsnav"]')) {
+          setMobileMode("nav");
+          return;
+        }
 
+        // Tapping direct messages icon (DM home button) at top of server rail: STAY IN NAV MODE to see DM conversations!
+        if (target.closest('[data-list-item-id="guildsnav___home"], a[href="/channels/@me"]')) {
+          setMobileMode("nav");
+          return;
+        }
+
+        // Tapping Member List icon in Header Bar toggles members drawer
+        if (target.closest('[data-dbc-member-toggle-btn="1"]') || target.closest('[data-dbc-header-bar="1"] [aria-label*="Member"], [data-dbc-header-bar="1"] [aria-label*="ThÃƒÂ nh viÃƒÂªn"]')) {
+          document.body.classList.toggle("dbc-members-open");
+          return;
+        }
+
+        // Tapping a Channel item or DM user item -> SWITCH TO CHAT MODE (fullscreen message area!)
         var chanItem = target.closest(
           '[data-list-id="channels"] a[href^="/channels/"], ' +
             '[data-list-id="channels"] [data-list-item-id^="channels___"], ' +
             '[data-list-id^="private-channels"] a[href^="/channels/@me/"]'
         );
         if (chanItem) {
-          // Ignore category collapse headers (they don't have href and have role="button" for category)
+          // If it's a category header (doesn't link to a channel), do not switch to chat
           var href = chanItem.getAttribute("href") || "";
           var itemId = chanItem.getAttribute("data-list-item-id") || "";
           if (href.split("/").length >= 4 || (itemId.indexOf("channels___") === 0 && itemId.indexOf("___") !== -1 && !chanItem.getAttribute("aria-expanded"))) {
             setTimeout(function () {
-              document.body.classList.remove("dbc-drawer-open");
-              updateMobileTabActiveState();
-            }, 120);
+              setMobileMode("chat");
+            }, 100);
           }
         }
       },
       true
     );
 
-    // 6. Touch Edge Swipe Gestures (Swipe right from left edge -> Open Drawer; Swipe left -> Close Drawer)
+    // 6. Swipe Gestures:
+    // When in Chat mode: Swipe Right from left edge -> Return to Channel List (Nav mode)
+    // Swipe Left from right edge -> Open Members Drawer
     var touchStartX = 0;
     var touchStartY = 0;
     document.addEventListener(
@@ -700,21 +720,25 @@
         var dx = e.changedTouches[0].clientX - touchStartX;
         var dy = Math.abs(e.changedTouches[0].clientY - touchStartY);
         if (dy > 65) return;
-        if (touchStartX <= 32 && dx > 65) {
-          document.body.classList.remove("dbc-members-open");
-          document.body.classList.add("dbc-drawer-open");
-          updateMobileTabActiveState();
-        } else if (dx < -70 && document.body.classList.contains("dbc-drawer-open")) {
-          document.body.classList.remove("dbc-drawer-open");
-          updateMobileTabActiveState();
-        } else if (touchStartX >= window.innerWidth - 32 && dx < -65) {
-          toggleMembersDrawerMobile();
+
+        if (currentMobileMode === "chat") {
+          // Swipe right from left edge to go back to Channels
+          if (touchStartX <= 40 && dx > 60) {
+            setMobileMode("nav");
+          } else if (touchStartX >= window.innerWidth - 40 && dx < -60) {
+            document.body.classList.toggle("dbc-members-open");
+          }
+        } else if (currentMobileMode === "nav") {
+          // Swipe left anywhere to go back to active channel chat
+          if (dx < -80) {
+            setMobileMode("chat");
+          }
         }
       },
       { passive: true }
     );
 
-    // 7. Auto-hide bottom tab bar when virtual keyboard focuses chat input
+    // 7. Virtual Keyboard handling
     document.addEventListener("focusin", function (e) {
       if (window.innerWidth > 820) return;
       var t = e.target;
@@ -731,7 +755,7 @@
       }, 100);
     });
 
-    // 8. Observe DOM mutations to keep layout attributes tagged smoothly
+    // 8. Observe DOM mutations & location changes
     var rafPending = false;
     var scheduleTag = function () {
       if (rafPending) return;
@@ -747,7 +771,7 @@
     window.addEventListener("popstate", scheduleTag);
     scheduleTag();
 
-    // 9. Fallback Bot Token Login Injection (only if Vencord's native AuthBoxTokenLogin hasn't rendered yet)
+    // 9. Fallback Bot Token Login Injection (only if Vencord AuthBoxTokenLogin hasn't rendered yet)
     setInterval(function () {
       tagDiscordMobileLayout();
       if (document.querySelector('input[name="token"], input[placeholder*="bot token" i]')) return;
@@ -770,9 +794,9 @@
       box.style.cssText = "display:flex;flex-direction:column;gap:12px;width:100%;margin-top:12px;text-align:left;";
       box.innerHTML =
         '<div style="font-size:12px;font-weight:700;text-transform:uppercase;color:#b5bac1;letter-spacing:0.04em;">BOT TOKEN</div>' +
-        '<input type="password" id="dbc-fallback-token-input" placeholder="Nhập Discord Bot Token của bạn..." autocomplete="off" autocapitalize="off" spellcheck="false" style="width:100%;padding:12px;border-radius:8px;border:1px solid rgba(255,255,255,0.1);background:#1e1f22;color:#f2f3f5;font-size:15px;outline:none;box-sizing:border-box;" />' +
+        '<input type="password" id="dbc-fallback-token-input" placeholder="NhÃ¡ÂºÂ­p Discord Bot Token cÃ¡Â»Â§a bÃ¡ÂºÂ¡n..." autocomplete="off" autocapitalize="off" spellcheck="false" style="width:100%;padding:12px;border-radius:8px;border:1px solid rgba(255,255,255,0.1);background:#1e1f22;color:#f2f3f5;font-size:15px;outline:none;box-sizing:border-box;" />' +
         '<div id="dbc-fallback-token-err" style="color:#fa777c;font-size:13px;display:none;"></div>' +
-        '<button type="button" id="dbc-fallback-token-btn" style="width:100%;padding:12px;border-radius:8px;border:none;background:#5865f2;color:#fff;font-size:15px;font-weight:600;cursor:pointer;">Đăng nhập Bot</button>';
+        '<button type="button" id="dbc-fallback-token-btn" style="width:100%;padding:12px;border-radius:8px;border:none;background:#5865f2;color:#fff;font-size:15px;font-weight:600;cursor:pointer;">Ã„ Ã„Æ’ng nhÃ¡ÂºÂ­p Bot</button>';
 
       formBlock.appendChild(box);
 
@@ -786,18 +810,18 @@
         try {
           var raw = (inputEl.value || "").replace(/^Bot\s+/i, "").trim();
           if (!raw || raw.split(".").length < 3) {
-            errEl.textContent = "Định dạng Bot Token không hợp lệ!";
+            errEl.textContent = "Ã„ Ã¡Â»â€¹nh dÃ¡ÂºÂ¡ng Bot Token khÃƒÂ´ng hÃ¡Â»Â£p lÃ¡Â»â€¡!";
             errEl.style.display = "block";
             return;
           }
           errEl.style.display = "none";
           btnEl.disabled = true;
-          btnEl.textContent = "Đang đăng nhập...";
+          btnEl.textContent = "Ã„ ang Ã„â€˜Ã„Æ’ng nhÃ¡ÂºÂ­p...";
 
           var finishLogin = function () {
             safeSetSession("currentShard", "0");
             safeSetLocal("token", JSON.stringify(raw));
-            btnEl.textContent = "Thành công! Đang mở Discord...";
+            btnEl.textContent = "ThÃƒÂ nh cÃƒÂ´ng! Ã„ ang mÃ¡Â»Å¸ Discord...";
 
             var usedWebpack = false;
             try {
@@ -836,10 +860,10 @@
             if (checkRes) {
               if (!checkRes.success) {
                 clearTimeout(watchdog);
-                errEl.textContent = checkRes.message || "Bot Token không hợp lệ!";
+                errEl.textContent = checkRes.message || "Bot Token khÃƒÂ´ng hÃ¡Â»Â£p lÃ¡Â»â€¡!";
                 errEl.style.display = "block";
                 btnEl.disabled = false;
-                btnEl.textContent = "Đăng nhập Bot";
+                btnEl.textContent = "Ã„ Ã„Æ’ng nhÃ¡ÂºÂ­p Bot";
                 return;
               }
               cachedBotMeta = checkRes;
@@ -853,10 +877,10 @@
           clearTimeout(watchdog);
           finishLogin();
         } catch (fatalErr) {
-          errEl.textContent = "Lỗi: " + (fatalErr && fatalErr.message ? fatalErr.message : String(fatalErr));
+          errEl.textContent = "LÃ¡Â»â€”i: " + (fatalErr && fatalErr.message ? fatalErr.message : String(fatalErr));
           errEl.style.display = "block";
           btnEl.disabled = false;
-          btnEl.textContent = "Đăng nhập Bot";
+          btnEl.textContent = "Ã„ Ã„Æ’ng nhÃ¡ÂºÂ­p Bot";
         }
       });
     }, 800);
