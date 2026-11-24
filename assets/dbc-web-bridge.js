@@ -255,6 +255,9 @@
 
     // Fallback Bot Token Login Injection on Mobile / iOS Safari if Discord renders the standard email/password form
     setInterval(function () {
+      // Do not inject fallback if Vencord's native AuthBoxTokenLogin is already rendered!
+      if (document.querySelector('input[name="token"][placeholder="Enter your bot token"]')) return;
+
       const emailInput = document.querySelector('input[name="email"], input[autocomplete*="username"]');
       if (!emailInput) return;
       const formBlock = emailInput.closest("form") || emailInput.parentElement?.parentElement?.parentElement;
@@ -280,14 +283,32 @@
       const errEl = box.querySelector("#dbc-fallback-token-err");
       const btnEl = box.querySelector("#dbc-fallback-token-btn");
 
-      btnEl.addEventListener("click", function (ev) {
+      btnEl.addEventListener("click", async function (ev) {
         ev.preventDefault();
+        ev.stopPropagation();
         const raw = (inputEl.value || "").replace(/^Bot\s+/i, "").trim();
         if (!raw || raw.split(".").length < 3) {
+          errEl.textContent = "Định dạng Bot Token không hợp lệ!";
           errEl.style.display = "block";
           return;
         }
         errEl.style.display = "none";
+        btnEl.disabled = true;
+        btnEl.textContent = "Đang xác thực Bot...";
+
+        try {
+          const checkRes = await window.BotClientNative.getBotInfo(raw);
+          if (!checkRes || !checkRes.success) {
+            errEl.textContent = (checkRes && checkRes.message) || "Bot Token không hợp lệ hoặc chưa bật MessageContent Intent!";
+            errEl.style.display = "block";
+            btnEl.disabled = false;
+            btnEl.textContent = "Login bằng Bot Token";
+            return;
+          }
+        } catch (err) {
+          console.warn(err);
+        }
+
         window.sessionStorage.setItem("currentShard", "0");
         try {
           if (window.Vencord && window.Vencord.Webpack) {
@@ -301,7 +322,7 @@
           console.warn(err);
         }
         window.localStorage.setItem("token", JSON.stringify(raw));
-        window.location.replace("/app");
+        window.location.replace("/channels/@me");
       });
     }, 600);
   }
