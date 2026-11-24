@@ -206,6 +206,8 @@ function buildPatchedDiscordHTML() {
     html = html.replace(/\snonce="[^"]*"/g, "");
     // 2b. Strip any pre-existing viewport meta tags so only our strict mobile viewport applies
     html = html.replace(/<meta[^>]*viewport[^>]*>/gi, "");
+    // 2c. Strip redundant preloads of hundreds of unused desktop chunks so mobile Safari doesn't choke on 500+ parallel requests
+    html = html.replace(/<link\s+as="script"\s+href="\/assets\/(?!(web\.f86c748842ee176f|585600\.85ec39628d89fab2|41814\.16b66adbca89c196)\.js)[^"]+"\s+rel="preload">\s*/g, "");
     // 3. Point GLOBAL_ENV endpoints to current origin (APIServer) and disable domain migration redirect
     html = html.replace('"API_ENDPOINT": "//discord.com/api"', '"API_ENDPOINT": "//" + window.location.host + "/api"');
     html = html.replace('"WEBAPP_ENDPOINT": "//discord.com"', '"WEBAPP_ENDPOINT": "//" + window.location.host');

@@ -1,0 +1,45 @@
+.vc-bot-client-auth-box-token-login-defaultMarginh5 {
+    margin-bottom: 8px;
+}
+
+.vc-bot-client-auth-box-token-login-h5 {
+    line-height: 20px;
+    color: #dbdee1;
+    font-size: 14px;
+    font-weight: 700;
+    margin-bottom: 8px;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+}
+
+.vc-bot-client-auth-box-token-login-error {
+    color: #fa777c;
+}
+
+.vc-bot-client-auth-box-token-login-errorMessage {
+    font-size: 12px;
+    font-style: italic;
+    font-weight: 500;
+}
+
+.vc-bot-client-auth-box-token-login-errorSeparator {
+    padding-inline: 4px;
+}
+
+/* Ensure Login Button & Input are always fully visible on mobile */
+.vc-bot-client-auth-box-token-login-button,
+[class*="authBox_"] button[type="button"],
+[class*="authBox_"] button[type="submit"] {
+    min-height: 44px !important;
+    height: 44px !important;
+    margin-top: 14px !important;
+    background: #5865f2 !important;
+    color: #ffffff !important;
+    border-radius: 8px !important;
+    font-size: 15px !important;
+    font-weight: 600 !important;
+    width: 100% !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+}
