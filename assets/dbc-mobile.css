@@ -34,6 +34,15 @@ body,
   -webkit-text-size-adjust: 100%;
   -webkit-tap-highlight-color: transparent;
   user-select: none;
+  touch-action: manipulation;
+}
+
+input,
+textarea,
+[contenteditable="true"],
+[role="textbox"] {
+  user-select: text !important;
+  -webkit-user-select: text !important;
 }
 
 /* Ensure ONLY top-level app wrapper hierarchy never collapses or centers (never touch toasts/modals!) */
@@ -194,10 +203,19 @@ body.dbc-mode-nav [class*="sidebar_"] {
   border-top-left-radius: 16px !important;
   overflow-y: auto !important;
   overflow-x: hidden !important;
+  -webkit-overflow-scrolling: touch;
   padding-top: var(--dbc-safe-top) !important;
   padding-bottom: calc(var(--dbc-profile-bar-h) + var(--dbc-safe-bottom) + 8px) !important;
   box-sizing: border-box !important;
   z-index: 90 !important;
+}
+
+body.dbc-mode-nav [class*="sidebar_"] > div,
+body.dbc-mode-nav [class*="sidebar_"] > nav,
+body.dbc-mode-nav [class*="sidebarList_"] {
+  width: 100% !important;
+  max-width: 100% !important;
+  min-width: 0 !important;
 }
 
 /* Unified drawer fallback if guilds & sidebar share a parent */
@@ -271,7 +289,8 @@ body.dbc-mode-chat #dbc-mobile-back-btn {
   position: fixed !important;
   top: calc(6px + var(--dbc-safe-top)) !important;
   left: 8px !important;
-  z-index: 10005 !important;
+  z-index: 99999 !important;
+  pointer-events: auto !important;
   width: 36px !important;
   height: 36px !important;
   border-radius: 50% !important;
@@ -310,7 +329,8 @@ body.dbc-mode-nav:not(.dbc-keyboard-open):not(.dbc-page-login) #dbc-profile-stri
   padding: 0 12px var(--dbc-safe-bottom) 12px !important;
   background: #111214 !important;
   border-top: 1px solid rgba(255, 255, 255, 0.08) !important;
-  z-index: 10020 !important;
+  z-index: 99999 !important;
+  pointer-events: auto !important;
   align-items: center !important;
   justify-content: space-between !important;
   box-sizing: border-box !important;

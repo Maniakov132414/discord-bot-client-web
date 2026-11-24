@@ -658,19 +658,20 @@
       "touchend",
       function (e) {
         if (!isMobileViewport() || !e.changedTouches || e.changedTouches.length !== 1) return;
-        if (!document.body.classList.contains("dbc-authenticated")) return;
+        if (document.body.classList.contains("dbc-page-login")) return;
         var dx = e.changedTouches[0].clientX - touchStartX;
         var dy = Math.abs(e.changedTouches[0].clientY - touchStartY);
-        if (dy > 65) return;
+        if (dy > 60) return;
 
         if (currentMobileMode === "chat") {
-          if (touchStartX <= 40 && dx > 60) {
+          if (dx > 70) {
+            // Swipe right anywhere in chat -> back to server & channel list (matches Discord iOS)
             setMobileMode("nav");
-          } else if (touchStartX >= window.innerWidth - 40 && dx < -60) {
+          } else if (touchStartX >= window.innerWidth - 50 && dx < -60) {
             document.body.classList.toggle("dbc-members-open");
           }
         } else if (currentMobileMode === "nav") {
-          if (dx < -80) {
+          if (dx < -70) {
             setMobileMode("chat");
           }
         }
