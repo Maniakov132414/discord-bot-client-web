@@ -363,13 +363,19 @@
   // 5. Discord Native Mobile App Navigation Controller
   // Replicates Discord Mobile UX:
   // - Mode "nav": User is browsing servers and channel list / DMs list (Left Rail + Channel list visible side-by-side)
-  // - Mode "chat": User tapped a channel -> fullscreen chat view with Back Button (Ã¢â€  ) to return to channels
+  // - Mode "chat": User tapped a channel -> fullscreen chat view with Back Button (â†) to return to channels
   // - Mode "profile": Bottom profile strip with bot avatar, name, status, and quick settings
 
   var currentMobileMode = "nav"; // "nav" or "chat"
 
+  function isMobileViewport() {
+    var isTouch = "ontouchstart" in window || navigator.maxTouchPoints > 0;
+    var isNarrow = window.innerWidth <= 1024;
+    return isTouch || isNarrow;
+  }
+
   function updateMobileMode() {
-    if (window.innerWidth > 820) {
+    if (!isMobileViewport()) {
       document.body.classList.remove("dbc-mode-nav", "dbc-mode-chat", "dbc-members-open");
       return;
     }
@@ -381,7 +387,6 @@
     if (path === "/channels/@me" || path === "/app" || path === "/") {
       setMobileMode("nav");
     } else {
-      // It's a specific channel or guild
       if (!sessionStorage.getItem("__dbc_mobile_nav_override__")) {
         setMobileMode("chat");
       } else {
@@ -407,7 +412,7 @@
   function tagDiscordMobileLayout() {
     if (!document.body) return;
 
-    var guildsList = document.querySelector('[data-list-id="guildsnav"]');
+    var guildsList = document.querySelector('[data-list-id="guildsnav"], nav[class*="guilds_"]');
     var isAuth = !!guildsList && window.location.pathname.indexOf("/login") !== 0;
     document.body.classList.toggle("dbc-authenticated", isAuth);
 
@@ -419,12 +424,12 @@
     updateMobileMode();
 
     var guildsNav = guildsList.closest("nav") || guildsList.parentElement;
-    var chanList = document.querySelector('[data-list-id="channels"], [data-list-id^="private-channels"]');
+    var chanList = document.querySelector('[data-list-id="channels"], [data-list-id^="private-channels"], [class*="sidebar_"]');
     var mainEl =
       document.querySelector('main[aria-label], main') ||
       (document.querySelector('[data-list-id^="chat-messages"]')
         ? document.querySelector('[data-list-id^="chat-messages"]').closest("section, div")
-        : null);
+        : document.querySelector('[class*="chat_"]'));
 
     // Identify rail, channel pane, and outer shell
     if (guildsNav && chanList) {
@@ -475,6 +480,12 @@
       }
     }
 
+    // Hide any Windows Titlebar or Vesktop header bar if rendered
+    var titleBars = document.querySelectorAll('[class*="winTitleBar_"], [class*="typeWindows_"], [class*="withFrame_"]');
+    titleBars.forEach(function (el) {
+      el.setAttribute("data-dbc-desktop-titlebar", "1");
+    });
+
     // Tag Channel Header Bar
     if (mainEl) {
       var headerBar =
@@ -482,14 +493,13 @@
         (mainEl.firstElementChild && mainEl.firstElementChild.offsetHeight <= 64 ? mainEl.firstElementChild : null);
       if (headerBar) {
         headerBar.setAttribute("data-dbc-header-bar", "1");
-        // Tag member toggle button inside header if present
-        var mBtn = headerBar.querySelector('[aria-label*="Member"], [aria-label*="ThÃƒÂ nh viÃƒÂªn"], [aria-label*="thÃƒÂ nh viÃƒÂªn"]');
+        var mBtn = headerBar.querySelector('[aria-label*="Member"], [aria-label*="ThÃ nh viÃªn"], [aria-label*="thÃ nh viÃªn"]');
         if (mBtn) mBtn.setAttribute("data-dbc-member-toggle-btn", "1");
       }
     }
 
     // Tag Right-Hand Members Sidebar Pane
-    var membersList = document.querySelector('[data-list-id^="members-"]');
+    var membersList = document.querySelector('[data-list-id^="members-"], [class*="membersWrap_"]');
     if (membersList && mainEl) {
       var mPane = membersList;
       while (mPane && mPane.parentElement && !mPane.parentElement.contains(mainEl)) {
@@ -526,7 +536,6 @@
     var strip = document.getElementById("dbc-profile-strip");
     if (!strip) return;
 
-    // Try reading cached bot user metadata
     var meta = cachedBotMeta;
     if (!meta) {
       try {
@@ -537,7 +546,6 @@
 
     var avatarUrl = "https://cdn.discordapp.com/embed/avatars/0.png";
     var username = "Bot Client";
-    var botTag = "BOT";
 
     if (meta && meta.botUser) {
       username = meta.botUser.username || "Bot";
@@ -545,7 +553,6 @@
         avatarUrl = "https://cdn.discordapp.com/avatars/" + meta.botUser.id + "/" + meta.botUser.avatar + ".png?size=64";
       }
     } else {
-      // Try reading user info from Discord DOM if available
       var userPanel = document.querySelector('section[aria-label*="User"], section[class*="panels_"]');
       if (userPanel) {
         var img = userPanel.querySelector("img");
@@ -569,7 +576,7 @@
       }
     } catch (e) {}
     var gearBtn = document.querySelector(
-      'button[aria-label*="Settings"], button[aria-label*="CÃƒÂ i Ã„â€˜Ã¡ÂºÂ·t"], button[aria-label*="ThiÃ¡ÂºÂ¿t lÃ¡ÂºÂ­p"]'
+      'button[aria-label*="Settings"], button[aria-label*="CÃ i Ä‘áº·t"], button[aria-label*="Thiáº¿t láº­p"]'
     );
     if (gearBtn) gearBtn.click();
   }
@@ -577,11 +584,11 @@
   function initMobileUI() {
     if (document.getElementById("dbc-mobile-back-btn")) return;
 
-    // 1. Channel Chat Header Back Button (Ã¢â€  )
+    // 1. Channel Chat Header Back Button (â†)
     var backBtn = document.createElement("button");
     backBtn.id = "dbc-mobile-back-btn";
     backBtn.type = "button";
-    backBtn.title = "Quay lÃ¡ÂºÂ¡i danh sÃƒÂ¡ch kÃƒÂªnh";
+    backBtn.title = "Quay láº¡i danh sÃ¡ch kÃªnh";
     backBtn.innerHTML =
       '<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/></svg>';
     backBtn.addEventListener("click", function (e) {
@@ -603,7 +610,7 @@
     var settingsBackBtn = document.createElement("button");
     settingsBackBtn.id = "dbc-settings-back-btn";
     settingsBackBtn.type = "button";
-    settingsBackBtn.textContent = "Ã¢â€   Danh mÃ¡Â»Â¥c CÃƒÂ i Ã„â€˜Ã¡ÂºÂ·t";
+    settingsBackBtn.textContent = "â† Danh má»¥c CÃ i Ä‘áº·t";
     settingsBackBtn.addEventListener("click", function () {
       document.body.classList.remove("dbc-settings-content-focused");
     });
@@ -617,15 +624,15 @@
       '  <div class="dbc-profile-avatar"><img src="https://cdn.discordapp.com/embed/avatars/0.png" alt="Avatar"/></div>' +
       '  <div class="dbc-profile-info">' +
       '    <div class="dbc-profile-name">Bot Client</div>' +
-      '    <div class="dbc-profile-tag">TrÃ¡Â»Â±c tuyÃ¡ÂºÂ¿n Ã¢â‚¬Â¢ Bot Client Web</div>' +
+      '    <div class="dbc-profile-tag">Trá»±c tuyáº¿n â€¢ Bot Client Web</div>' +
       '  </div>' +
       '</div>' +
       '<div class="dbc-profile-actions">' +
-      '  <button type="button" class="dbc-profile-btn" id="dbc-btn-discohook" title="MÃ¡Â»Å¸ Discohook">' +
+      '  <button type="button" class="dbc-profile-btn" id="dbc-btn-discohook" title="Má»Ÿ Discohook">' +
       '    <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2l2.4 7.2L22 12l-7.6 2.8L12 22l-2.4-7.2L2 12l7.6-2.8L12 2z"/></svg>' +
       '    <span>Discohook</span>' +
       '  </button>' +
-      '  <button type="button" class="dbc-profile-btn" id="dbc-btn-settings" title="CÃƒÂ i Ã„â€˜Ã¡ÂºÂ·t">' +
+      '  <button type="button" class="dbc-profile-btn" id="dbc-btn-settings" title="CÃ i Ä‘áº·t">' +
       '    <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>' +
       '  </button>' +
       '</div>';
@@ -647,12 +654,12 @@
     document.addEventListener(
       "click",
       function (e) {
-        if (window.innerWidth > 820) return;
+        if (!isMobileViewport()) return;
         var target = e.target;
         if (!target || !target.closest) return;
 
         // Settings tab click -> drill down
-        var settingsTab = target.closest('[data-dbc-settings-nav="1"] [role="tab"]');
+        var settingsTab = target.closest('[data-dbc-settings-nav="1"] [role="tab"], [class*="standardSidebarView_"] [role="tab"]');
         if (settingsTab) {
           setTimeout(function () {
             document.body.classList.add("dbc-settings-content-focused");
@@ -661,7 +668,7 @@
         }
 
         // Server icon click (inside guildsnav): STAY IN NAV MODE! So user sees channels list for that server!
-        if (target.closest('[data-list-id="guildsnav"]')) {
+        if (target.closest('[data-list-id="guildsnav"], nav[class*="guilds_"]')) {
           setMobileMode("nav");
           return;
         }
@@ -673,7 +680,7 @@
         }
 
         // Tapping Member List icon in Header Bar toggles members drawer
-        if (target.closest('[data-dbc-member-toggle-btn="1"]') || target.closest('[data-dbc-header-bar="1"] [aria-label*="Member"], [data-dbc-header-bar="1"] [aria-label*="ThÃƒÂ nh viÃƒÂªn"]')) {
+        if (target.closest('[data-dbc-member-toggle-btn="1"]') || target.closest('[data-dbc-header-bar="1"] [aria-label*="Member"], [data-dbc-header-bar="1"] [aria-label*="ThÃ nh viÃªn"], [data-dbc-header-bar="1"] [aria-label*="thÃ nh viÃªn"]')) {
           document.body.classList.toggle("dbc-members-open");
           return;
         }
@@ -682,10 +689,10 @@
         var chanItem = target.closest(
           '[data-list-id="channels"] a[href^="/channels/"], ' +
             '[data-list-id="channels"] [data-list-item-id^="channels___"], ' +
-            '[data-list-id^="private-channels"] a[href^="/channels/@me/"]'
+            '[data-list-id^="private-channels"] a[href^="/channels/@me/"], ' +
+            '[class*="sidebar_"] a[href^="/channels/"]'
         );
         if (chanItem) {
-          // If it's a category header (doesn't link to a channel), do not switch to chat
           var href = chanItem.getAttribute("href") || "";
           var itemId = chanItem.getAttribute("data-list-item-id") || "";
           if (href.split("/").length >= 4 || (itemId.indexOf("channels___") === 0 && itemId.indexOf("___") !== -1 && !chanItem.getAttribute("aria-expanded"))) {
@@ -698,15 +705,13 @@
       true
     );
 
-    // 6. Swipe Gestures:
-    // When in Chat mode: Swipe Right from left edge -> Return to Channel List (Nav mode)
-    // Swipe Left from right edge -> Open Members Drawer
+    // 6. Swipe Gestures
     var touchStartX = 0;
     var touchStartY = 0;
     document.addEventListener(
       "touchstart",
       function (e) {
-        if (window.innerWidth > 820 || !e.touches || e.touches.length !== 1) return;
+        if (!isMobileViewport() || !e.touches || e.touches.length !== 1) return;
         touchStartX = e.touches[0].clientX;
         touchStartY = e.touches[0].clientY;
       },
@@ -715,21 +720,19 @@
     document.addEventListener(
       "touchend",
       function (e) {
-        if (window.innerWidth > 820 || !e.changedTouches || e.changedTouches.length !== 1) return;
+        if (!isMobileViewport() || !e.changedTouches || e.changedTouches.length !== 1) return;
         if (!document.body.classList.contains("dbc-authenticated")) return;
         var dx = e.changedTouches[0].clientX - touchStartX;
         var dy = Math.abs(e.changedTouches[0].clientY - touchStartY);
         if (dy > 65) return;
 
         if (currentMobileMode === "chat") {
-          // Swipe right from left edge to go back to Channels
           if (touchStartX <= 40 && dx > 60) {
             setMobileMode("nav");
           } else if (touchStartX >= window.innerWidth - 40 && dx < -60) {
             document.body.classList.toggle("dbc-members-open");
           }
         } else if (currentMobileMode === "nav") {
-          // Swipe left anywhere to go back to active channel chat
           if (dx < -80) {
             setMobileMode("chat");
           }
@@ -740,7 +743,7 @@
 
     // 7. Virtual Keyboard handling
     document.addEventListener("focusin", function (e) {
-      if (window.innerWidth > 820) return;
+      if (!isMobileViewport()) return;
       var t = e.target;
       if (t && (t.tagName === "INPUT" || t.tagName === "TEXTAREA" || t.getAttribute("role") === "textbox" || t.isContentEditable)) {
         document.body.classList.add("dbc-keyboard-open");
@@ -794,9 +797,9 @@
       box.style.cssText = "display:flex;flex-direction:column;gap:12px;width:100%;margin-top:12px;text-align:left;";
       box.innerHTML =
         '<div style="font-size:12px;font-weight:700;text-transform:uppercase;color:#b5bac1;letter-spacing:0.04em;">BOT TOKEN</div>' +
-        '<input type="password" id="dbc-fallback-token-input" placeholder="NhÃ¡ÂºÂ­p Discord Bot Token cÃ¡Â»Â§a bÃ¡ÂºÂ¡n..." autocomplete="off" autocapitalize="off" spellcheck="false" style="width:100%;padding:12px;border-radius:8px;border:1px solid rgba(255,255,255,0.1);background:#1e1f22;color:#f2f3f5;font-size:15px;outline:none;box-sizing:border-box;" />' +
+        '<input type="password" id="dbc-fallback-token-input" placeholder="Nháº­p Discord Bot Token cá»§a báº¡n..." autocomplete="off" autocapitalize="off" spellcheck="false" style="width:100%;padding:12px;border-radius:8px;border:1px solid rgba(255,255,255,0.1);background:#1e1f22;color:#f2f3f5;font-size:15px;outline:none;box-sizing:border-box;" />' +
         '<div id="dbc-fallback-token-err" style="color:#fa777c;font-size:13px;display:none;"></div>' +
-        '<button type="button" id="dbc-fallback-token-btn" style="width:100%;padding:12px;border-radius:8px;border:none;background:#5865f2;color:#fff;font-size:15px;font-weight:600;cursor:pointer;">Ã„ Ã„Æ’ng nhÃ¡ÂºÂ­p Bot</button>';
+        '<button type="button" id="dbc-fallback-token-btn" style="width:100%;padding:12px;border-radius:8px;border:none;background:#5865f2;color:#fff;font-size:15px;font-weight:600;cursor:pointer;">ÄÄƒng nháº­p Bot</button>';
 
       formBlock.appendChild(box);
 
@@ -810,18 +813,18 @@
         try {
           var raw = (inputEl.value || "").replace(/^Bot\s+/i, "").trim();
           if (!raw || raw.split(".").length < 3) {
-            errEl.textContent = "Ã„ Ã¡Â»â€¹nh dÃ¡ÂºÂ¡ng Bot Token khÃƒÂ´ng hÃ¡Â»Â£p lÃ¡Â»â€¡!";
+            errEl.textContent = "Äá»‹nh dáº¡ng Bot Token khÃ´ng há»£p lá»‡!";
             errEl.style.display = "block";
             return;
           }
           errEl.style.display = "none";
           btnEl.disabled = true;
-          btnEl.textContent = "Ã„ ang Ã„â€˜Ã„Æ’ng nhÃ¡ÂºÂ­p...";
+          btnEl.textContent = "Äang Ä‘Äƒng nháº­p...";
 
           var finishLogin = function () {
             safeSetSession("currentShard", "0");
             safeSetLocal("token", JSON.stringify(raw));
-            btnEl.textContent = "ThÃƒÂ nh cÃƒÂ´ng! Ã„ ang mÃ¡Â»Å¸ Discord...";
+            btnEl.textContent = "ThÃ nh cÃ´ng! Äang má»Ÿ Discord...";
 
             var usedWebpack = false;
             try {
@@ -860,10 +863,10 @@
             if (checkRes) {
               if (!checkRes.success) {
                 clearTimeout(watchdog);
-                errEl.textContent = checkRes.message || "Bot Token khÃƒÂ´ng hÃ¡Â»Â£p lÃ¡Â»â€¡!";
+                errEl.textContent = checkRes.message || "Bot Token khÃ´ng há»£p lá»‡!";
                 errEl.style.display = "block";
                 btnEl.disabled = false;
-                btnEl.textContent = "Ã„ Ã„Æ’ng nhÃ¡ÂºÂ­p Bot";
+                btnEl.textContent = "ÄÄƒng nháº­p Bot";
                 return;
               }
               cachedBotMeta = checkRes;
@@ -877,10 +880,10 @@
           clearTimeout(watchdog);
           finishLogin();
         } catch (fatalErr) {
-          errEl.textContent = "LÃ¡Â»â€”i: " + (fatalErr && fatalErr.message ? fatalErr.message : String(fatalErr));
+          errEl.textContent = "Lá»—i: " + (fatalErr && fatalErr.message ? fatalErr.message : String(fatalErr));
           errEl.style.display = "block";
           btnEl.disabled = false;
-          btnEl.textContent = "Ã„ Ã„Æ’ng nhÃ¡ÂºÂ­p Bot";
+          btnEl.textContent = "ÄÄƒng nháº­p Bot";
         }
       });
     }, 800);

@@ -2,7 +2,7 @@
  * DiscordBotClient — Discord Native Mobile App UI Stylesheet
  * Replicates the authentic Discord Mobile App layout:
  * - 2-Column Split Navigation when browsing Servers/Channels/DMs:
- *   Left Rail (Server icons, ~70px) + Main Panel (Channels list / DMs list, calc(100vw - 70px))
+ *   Left Rail (Server icons, ~72px) + Main Panel (Channels list / DMs list, calc(100vw - 72px))
  * - Fullscreen Chat / Channel view when in a conversation:
  *   Hides server rail and channel list, chat takes 100vw, with Back Button (â† ) to return to channels
  * - Profile / User Bar at bottom left rail with clickable popout/profile
@@ -73,9 +73,10 @@
 }
 
 /* ============================================================================
- * MOBILE APP MODE (Phones & Compact Screens <= 820px)
+ * MOBILE APP MODE (Phones & Touch Screens)
+ * Apply automatically on touch devices / screens <= 1024px or when dbc-mobile-active is set
  * ============================================================================ */
-@media (max-width: 820px) {
+@media (max-width: 1024px), (pointer: coarse) {
   html,
   body,
   #app-mount {
@@ -88,23 +89,38 @@
     -webkit-text-size-adjust: 100%;
   }
 
-  /* Reserve space for notch */
+  /* Reserve space for iOS Notch */
   #app-mount {
     padding-top: var(--dbc-safe-top) !important;
     box-sizing: border-box !important;
   }
 
-  /* Hide Desktop Titlebar */
-  [data-dbc-desktop-titlebar="1"] {
+  /* 0. Triệt để ẩn Windows Titlebar / Vesktop Header Bar trên Mobile */
+  [data-dbc-desktop-titlebar="1"],
+  [class*="winTitleBar_"],
+  [class*="typeWindows_"],
+  [class*="withFrame_"],
+  [class*="titleBar_"]:not([data-dbc-header-bar="1"]) {
     display: none !important;
+    height: 0 !important;
+    min-height: 0 !important;
+    max-height: 0 !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    border: none !important;
+    overflow: hidden !important;
+    pointer-events: none !important;
   }
 
   /* Shell Container */
-  [data-dbc-shell="1"] {
+  [data-dbc-shell="1"],
+  #app-mount > div,
+  #app-mount > div > div {
     width: 100vw !important;
     max-width: 100vw !important;
     min-width: 0 !important;
-    height: calc(100dvh - var(--dbc-safe-top)) !important;
+    height: 100% !important;
+    max-height: 100% !important;
     position: relative !important;
     display: flex !important;
     overflow: hidden !important;
@@ -116,7 +132,8 @@
    * Right Pane: Channel list or Direct Messages list (calc(100vw - 72px))
    * Chat Area: Hidden
    * ========================================================================== */
-  body.dbc-mode-nav [data-dbc-guilds-rail="1"] {
+  body.dbc-mode-nav [data-dbc-guilds-rail="1"],
+  body.dbc-mode-nav nav[class*="guilds_"] {
     display: flex !important;
     width: var(--dbc-rail-width) !important;
     min-width: var(--dbc-rail-width) !important;
@@ -126,30 +143,39 @@
     background: #111214 !important;
     overflow-y: auto !important;
     overflow-x: hidden !important;
-    padding-bottom: calc(var(--dbc-profile-bar-h) + var(--dbc-safe-bottom) + 10px) !important;
+    padding-bottom: calc(var(--dbc-profile-bar-h) + var(--dbc-safe-bottom) + 12px) !important;
     box-sizing: border-box !important;
     z-index: 100 !important;
   }
 
-  body.dbc-mode-nav [data-dbc-chan-pane="1"] {
+  body.dbc-mode-nav [data-dbc-chan-pane="1"],
+  body.dbc-mode-nav [class*="sidebar_"] {
     display: flex !important;
+    flex-direction: column !important;
     flex: 1 1 auto !important;
     width: calc(100vw - var(--dbc-rail-width)) !important;
     min-width: 0 !important;
     max-width: calc(100vw - var(--dbc-rail-width)) !important;
     height: 100% !important;
     background: #1e1f22 !important;
-    border-top-left-radius: 18px !important;
+    border-top-left-radius: 16px !important;
     overflow-y: auto !important;
     overflow-x: hidden !important;
-    padding-bottom: calc(var(--dbc-profile-bar-h) + var(--dbc-safe-bottom) + 10px) !important;
+    padding-bottom: calc(var(--dbc-profile-bar-h) + var(--dbc-safe-bottom) + 12px) !important;
     box-sizing: border-box !important;
     z-index: 90 !important;
   }
 
+  /* Ẩn user panel desktop ở góc dưới sidebar vì đã có profile bar mobile */
+  [data-dbc-chan-pane="1"] section[class*="panels_"],
+  [class*="sidebar_"] section[class*="panels_"] {
+    display: none !important;
+  }
+
   /* In Nav Mode, hide Chat area */
   body.dbc-mode-nav [data-dbc-content="1"],
-  body.dbc-mode-nav main {
+  body.dbc-mode-nav main,
+  body.dbc-mode-nav [class*="chat_"] {
     display: none !important;
   }
 
@@ -171,8 +197,8 @@
     width: calc(100vw - var(--dbc-rail-width)) !important;
     min-width: 0 !important;
     background: #1e1f22 !important;
-    border-top-left-radius: 18px !important;
-    padding-bottom: calc(var(--dbc-profile-bar-h) + var(--dbc-safe-bottom) + 10px) !important;
+    border-top-left-radius: 16px !important;
+    padding-bottom: calc(var(--dbc-profile-bar-h) + var(--dbc-safe-bottom) + 12px) !important;
     box-sizing: border-box !important;
   }
 
@@ -184,12 +210,15 @@
    * ========================================================================== */
   body.dbc-mode-chat [data-dbc-guilds-rail="1"],
   body.dbc-mode-chat [data-dbc-chan-pane="1"],
-  body.dbc-mode-chat [data-dbc-drawer="unified"] {
+  body.dbc-mode-chat [data-dbc-drawer="unified"],
+  body.dbc-mode-chat nav[class*="guilds_"],
+  body.dbc-mode-chat [class*="sidebar_"] {
     display: none !important;
   }
 
   body.dbc-mode-chat [data-dbc-content="1"],
-  body.dbc-mode-chat main {
+  body.dbc-mode-chat main,
+  body.dbc-mode-chat [class*="chat_"] {
     display: flex !important;
     width: 100vw !important;
     max-width: 100vw !important;
@@ -197,6 +226,7 @@
     flex: 1 1 100vw !important;
     height: 100% !important;
     background: #1e1f22 !important;
+    position: relative !important;
   }
 
   /* Back Button on Channel Header */
@@ -213,26 +243,28 @@
     width: 36px !important;
     height: 36px !important;
     border-radius: 50% !important;
-    background: rgba(43, 45, 49, 0.85) !important;
+    background: rgba(43, 45, 49, 0.9) !important;
     backdrop-filter: blur(8px) !important;
     -webkit-backdrop-filter: blur(8px) !important;
     color: #f2f3f5 !important;
-    border: 1px solid rgba(255, 255, 255, 0.12) !important;
+    border: 1px solid rgba(255, 255, 255, 0.14) !important;
     align-items: center !important;
     justify-content: center !important;
     cursor: pointer !important;
     padding: 0 !important;
     -webkit-tap-highlight-color: transparent !important;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.4) !important;
   }
 
   /* Give header room for back button in Chat mode */
-  body.dbc-mode-chat [data-dbc-header-bar="1"] {
-    padding-left: 52px !important;
+  body.dbc-mode-chat [data-dbc-header-bar="1"],
+  body.dbc-mode-chat section[class*="title_"] {
+    padding-left: 54px !important;
   }
 
   /* ==========================================================================
    * 3. BOTTOM PROFILE BAR (Native Discord Mobile User Bar across bottom)
-   * Shows user avatar, name, status, notification badge, and quick settings
+   * Shows user avatar, name, status, and quick settings
    * ========================================================================== */
   #dbc-profile-strip {
     display: none;
@@ -264,8 +296,8 @@
   }
 
   .dbc-profile-avatar {
-    width: 36px;
-    height: 36px;
+    width: 38px;
+    height: 38px;
     border-radius: 50%;
     background: #5865f2;
     flex-shrink: 0;
@@ -312,11 +344,11 @@
   }
 
   .dbc-profile-btn {
-    background: rgba(255, 255, 255, 0.07);
-    border: 1px solid rgba(255, 255, 255, 0.08);
+    background: rgba(255, 255, 255, 0.08);
+    border: 1px solid rgba(255, 255, 255, 0.1);
     border-radius: 18px;
     color: #f2f3f5;
-    padding: 6px 12px;
+    padding: 7px 12px;
     font-size: 12px;
     font-weight: 600;
     display: inline-flex;
@@ -326,7 +358,7 @@
     -webkit-tap-highlight-color: transparent;
   }
 
-  .dbc-profile-btn.active {
+  .dbc-profile-btn:active {
     background: #5865f2;
     color: #fff;
   }
@@ -334,7 +366,8 @@
   /* ==========================================================================
    * 4. MEMBERS DRAWER (Slide-over from right)
    * ========================================================================== */
-  [data-dbc-members-pane="1"] {
+  [data-dbc-members-pane="1"],
+  aside[class*="membersWrap_"] {
     position: fixed !important;
     top: var(--dbc-safe-top) !important;
     right: 0 !important;
@@ -350,7 +383,8 @@
     overflow-y: auto !important;
   }
 
-  body.dbc-members-open [data-dbc-members-pane="1"] {
+  body.dbc-members-open [data-dbc-members-pane="1"],
+  body.dbc-members-open aside[class*="membersWrap_"] {
     transform: translate3d(0, 0, 0) !important;
   }
 
@@ -372,25 +406,19 @@
     pointer-events: auto;
   }
 
-  /* Member Toggle Button in Channel Header */
-  [data-dbc-member-toggle-btn="1"] {
-    display: inline-flex !important;
-    align-items: center !important;
-    justify-content: center !important;
-    padding: 6px !important;
-  }
-
   /* ==========================================================================
    * 5. SETTINGS DRILL-DOWN NAVIGATION ON MOBILE
    * ========================================================================== */
-  [data-dbc-settings-root="1"] {
+  [data-dbc-settings-root="1"],
+  [class*="standardSidebarView_"] {
     flex-direction: column !important;
     width: 100vw !important;
     max-width: 100vw !important;
     background: #111214 !important;
   }
 
-  [data-dbc-settings-nav="1"] {
+  [data-dbc-settings-nav="1"],
+  [class*="standardSidebarView_"] > nav {
     width: 100vw !important;
     max-width: 100vw !important;
     flex: 0 0 auto !important;
@@ -399,24 +427,19 @@
     border-bottom: 1px solid rgba(255, 255, 255, 0.1) !important;
   }
 
-  body.dbc-settings-content-focused [data-dbc-settings-nav="1"] {
+  body.dbc-settings-content-focused [data-dbc-settings-nav="1"],
+  body.dbc-settings-content-focused [class*="standardSidebarView_"] > nav {
     display: none !important;
   }
 
-  [data-dbc-settings-body="1"] {
+  [data-dbc-settings-body="1"],
+  [class*="standardSidebarView_"] > [class*="contentRegion_"] {
     width: 100vw !important;
     max-width: 100vw !important;
     min-width: 0 !important;
     flex: 1 1 auto !important;
     overflow-y: auto !important;
     background: #1e1f22 !important;
-  }
-
-  [data-dbc-settings-body="1"] > div {
-    min-width: 0 !important;
-    max-width: 100vw !important;
-    padding: 16px 14px 60px 14px !important;
-    box-sizing: border-box !important;
   }
 
   body.dbc-settings-content-focused #dbc-settings-back-btn {

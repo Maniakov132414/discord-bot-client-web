@@ -204,6 +204,8 @@ function buildPatchedDiscordHTML() {
     html = html.replace(/<script[^>]*>\s*\(function\(\)\s*\{\s*function c\(\)[\s\S]*?<\/script>/i, "");
     // 2. Strip nonce attributes so browser allows our injected Vencord & Web Bridge scripts
     html = html.replace(/\snonce="[^"]*"/g, "");
+    // 2b. Strip any pre-existing viewport meta tags so only our strict mobile viewport applies
+    html = html.replace(/<meta[^>]*viewport[^>]*>/gi, "");
     // 3. Point GLOBAL_ENV endpoints to current origin (APIServer) and disable domain migration redirect
     html = html.replace('"API_ENDPOINT": "//discord.com/api"', '"API_ENDPOINT": "//" + window.location.host + "/api"');
     html = html.replace('"WEBAPP_ENDPOINT": "//discord.com"', '"WEBAPP_ENDPOINT": "//" + window.location.host');
