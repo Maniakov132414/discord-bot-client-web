@@ -114,6 +114,23 @@ self.addEventListener("activate", (event) => {
 app.post("/dbc-bridge/get-bot-info", express_1.default.json(), async (req, res) => {
     try {
         let token = req.body?.token;
+        // On Vercel (@vercel/node), req.body may already be a string or Buffer if not parsed by express.json()
+        if (!token && typeof req.body === "string") {
+            try {
+                token = JSON.parse(req.body)?.token;
+            }
+            catch {
+                // ignore
+            }
+        }
+        else if (!token && Buffer.isBuffer(req.body)) {
+            try {
+                token = JSON.parse(req.body.toString("utf8"))?.token;
+            }
+            catch {
+                // ignore
+            }
+        }
         if (typeof token !== "string" || token.length > 512) {
             return res.json({ success: false, message: "Invalid bot token." });
         }
@@ -126,6 +143,7 @@ app.post("/dbc-bridge/get-bot-info", express_1.default.json(), async (req, res) 
                 Authorization: `Bot ${token}`,
                 "User-Agent": Constants_1.default.UserAgentDiscordBot,
             },
+            signal: AbortSignal.timeout(8000),
         });
         if (!discordRes.ok) {
             const errData = (await discordRes.json().catch(() => null));
@@ -237,6 +255,8 @@ app.all("*", function (req, _res, next) {
 });
 // Register all 80+ DiscordBotClient custom API routes (/api/v10, /api/v9, /api)
 (0, RegisterRoutes_1.registerRoutesSync)(app, path_1.default.resolve(__dirname, "AppCore", "routes"), ["/api/v10", "/api/v9", "/api"]);
+// Parse JSON for our bridge endpoint AFTER registerRoutesSync so Util.getDataFromRequest on /api/* streams remains untouched
+app.use("/dbc-bridge", express_1.default.json());
 // Disk + memory cache for Discord's immutable hashed assets (/assets/*.js|css|wasm|woff2|svg|png...)
 // Uses /tmp on Vercel (read-only filesystem) or .cache/assets locally.
 const ASSET_CACHE_DIR = process.env.VERCEL
