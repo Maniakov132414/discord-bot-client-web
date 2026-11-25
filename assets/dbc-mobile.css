@@ -1,5 +1,5 @@
 /**
- * DiscordBotClient — Discord Native Mobile App UI Stylesheet
+ * DiscordBotClient — Discord Native iOS Mobile App UI Stylesheet
  *
  * ALL mobile overrides are strictly scoped under `body.dbc-mobile-active`
  * so PC / Desktop browsers keep 100% original Discord desktop layout!
@@ -54,8 +54,211 @@
   background: #111214;
 }
 
-#dbc-settings-back-btn {
+#dbc-settings-back-btn,
+#dbc-settings-close-btn {
   display: none;
+}
+
+/* ============================================================================
+ * MULTI-BOT ACCOUNT SWITCHER MODAL (Desktop + Mobile)
+ * ============================================================================ */
+#dbc-bot-vault-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 100300;
+  background: rgba(0, 0, 0, 0.72);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: max(16px, env(safe-area-inset-top, 0px)) 16px max(20px, env(safe-area-inset-bottom, 0px));
+  box-sizing: border-box;
+}
+
+.dbc-vault-card {
+  width: 100%;
+  max-width: 410px;
+  max-height: 85dvh;
+  display: flex;
+  flex-direction: column;
+  background: #2b2d31;
+  color: #f2f3f5;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 16px;
+  box-shadow: 0 18px 48px rgba(0, 0, 0, 0.65);
+  overflow: hidden;
+}
+
+.dbc-vault-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 16px;
+  background: #1e1f22;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  font-size: 15px;
+  font-weight: 700;
+}
+
+.dbc-vault-close {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  background: rgba(255, 255, 255, 0.06);
+  color: #f2f3f5;
+  cursor: pointer;
+}
+
+.dbc-vault-body {
+  padding: 14px 16px;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.dbc-vault-note {
+  font-size: 12px;
+  color: #b5bac1;
+  background: rgba(88, 101, 242, 0.12);
+  border: 1px solid rgba(88, 101, 242, 0.28);
+  border-radius: 10px;
+  padding: 8px 10px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.dbc-vault-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.dbc-vault-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px;
+  border-radius: 12px;
+  background: #1e1f22;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.dbc-vault-item.active {
+  border-color: #5865f2;
+  background: rgba(88, 101, 242, 0.14);
+}
+
+.dbc-vault-avatar {
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  object-fit: cover;
+  background: #111214;
+  flex-shrink: 0;
+}
+
+.dbc-vault-meta {
+  flex: 1;
+  min-width: 0;
+}
+
+.dbc-vault-name {
+  font-size: 14px;
+  font-weight: 700;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.dbc-vault-id {
+  font-size: 11px;
+  color: #949ba4;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+
+.dbc-vault-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+.dbc-vault-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  padding: 6px 10px;
+  border-radius: 8px;
+  border: none;
+  background: #5865f2;
+  color: #fff;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.dbc-vault-del {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  border-radius: 8px;
+  border: 1px solid rgba(250, 119, 124, 0.35);
+  background: rgba(250, 119, 124, 0.12);
+  color: #fa777c;
+  cursor: pointer;
+}
+
+.dbc-vault-add {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding-top: 10px;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.dbc-vault-input {
+  width: 100%;
+  min-height: 42px;
+  padding: 10px 12px;
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  background: #1e1f22;
+  color: #f2f3f5;
+  font-size: 15px;
+  box-sizing: border-box;
+  outline: none;
+}
+
+.dbc-vault-add-btn {
+  width: 100%;
+  min-height: 42px;
+  border-radius: 8px;
+  border: none;
+  background: #5865f2;
+  color: #ffffff;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+}
+
+.dbc-vault-err {
+  color: #fa777c;
+  font-size: 12px;
 }
 
 body.dbc-mobile-active {
@@ -95,6 +298,31 @@ body.dbc-mobile-active [role="textbox"] {
   -webkit-user-select: text !important;
 }
 
+/* Hide desktop hover tooltips so tapping a guild never leaves one stuck open */
+body.dbc-mobile-active [role="tooltip"],
+body.dbc-mobile-active [class*="listItemTooltip_"],
+body.dbc-mobile-active [class*="tooltip_"] {
+  display: none !important;
+  opacity: 0 !important;
+  pointer-events: none !important;
+}
+
+/* Hide broken badge/role-icon placeholders */
+img[data-dbc-hidden-broken-badge="1"] {
+  display: none !important;
+}
+
+/* Hide user-only DM nav items (Nitro, Shop, Quests) */
+body.dbc-mobile-active a[href="/store"],
+body.dbc-mobile-active a[href="/shop"],
+body.dbc-mobile-active a[href="/quests"],
+body.dbc-mobile-active [data-list-item-id*="___nitro"],
+body.dbc-mobile-active [data-list-item-id*="___shop"],
+body.dbc-mobile-active [data-list-item-id*="___quests"],
+body.dbc-mobile-active [data-list-item-id*="___store"] {
+  display: none !important;
+}
+
 /* Ensure top-level app wrapper hierarchy fits viewport cleanly (excluded during login) */
 body.dbc-mobile-active:not(.dbc-page-login) #app-mount > div,
 body.dbc-mobile-active:not(.dbc-page-login) #app-mount > [class*="appAsidePanelWrapper_"],
@@ -112,7 +340,6 @@ body.dbc-mobile-active:not(.dbc-page-login) #app-mount [class*="layer_"] > [clas
   box-sizing: border-box !important;
 }
 
-/* The outer Discord layout container: flex row (NEVER apply when on login screen!) */
 body.dbc-mobile-active:not(.dbc-page-login) #app-mount [class*="base_"] {
   display: flex !important;
   flex-direction: row !important;
@@ -157,7 +384,6 @@ body.dbc-mobile-active [data-dbc-desktop-titlebar="1"] {
   top: -9999px !important;
 }
 
-/* Hide desktop QR code scanner / login side art on mobile */
 body.dbc-mobile-active [class*="qrCodeContainer_"],
 body.dbc-mobile-active [class*="verticalSeparator_"] {
   display: none !important;
@@ -172,6 +398,7 @@ body.dbc-mobile-active.dbc-page-login [data-dbc-chan-pane],
 body.dbc-mobile-active.dbc-page-login #dbc-profile-strip,
 body.dbc-mobile-active.dbc-page-login #dbc-mobile-back-btn,
 body.dbc-mobile-active.dbc-page-login #dbc-settings-back-btn,
+body.dbc-mobile-active.dbc-page-login #dbc-settings-close-btn,
 body.dbc-mobile-active.dbc-page-login [class*="characterBackground_"] > svg,
 body.dbc-mobile-active.dbc-page-login [class*="artwork_"] {
   display: none !important;
@@ -250,8 +477,25 @@ body.dbc-mobile-active #dbc-fallback-token-btn {
   border: none !important;
 }
 
+.dbc-login-vault-btn {
+  width: 100% !important;
+  min-height: 42px !important;
+  border-radius: 8px !important;
+  background: rgba(255, 255, 255, 0.08) !important;
+  border: 1px solid rgba(255, 255, 255, 0.16) !important;
+  color: #f2f3f5 !important;
+  font-size: 14px !important;
+  font-weight: 600 !important;
+  margin-top: 10px !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  gap: 8px !important;
+  cursor: pointer !important;
+}
+
 /* ============================================================================
- * 2. MOBILE NAVIGATION MODE (Browsing Servers + Channels List)
+ * 2. MOBILE NAVIGATION MODE (Solid Server Rail + Channel List)
  * ============================================================================ */
 body.dbc-mobile-active.dbc-mode-nav [data-dbc-drawer="unified"] {
   display: flex !important;
@@ -272,6 +516,16 @@ body.dbc-mobile-active.dbc-mode-nav [data-dbc-drawer="unified"] {
   overflow: hidden !important;
   position: relative !important;
   z-index: 90 !important;
+  background: #111214 !important;
+}
+
+body.dbc-mobile-active.dbc-mode-nav [data-dbc-guilds-rail="1"],
+body.dbc-mobile-active.dbc-mode-nav nav[class*="guilds_"],
+body.dbc-mobile-active.dbc-mode-nav nav[class*="guilds_"] [class*="scroller_"],
+body.dbc-mobile-active.dbc-mode-nav nav[class*="guilds_"] [class*="itemsContainer_"] {
+  background: #111214 !important;
+  background-color: #111214 !important;
+  background-image: none !important;
 }
 
 body.dbc-mobile-active.dbc-mode-nav [data-dbc-guilds-rail="1"],
@@ -286,7 +540,6 @@ body.dbc-mobile-active.dbc-mode-nav nav[class*="guilds_"] {
   max-width: var(--dbc-rail-width) !important;
   height: 100% !important;
   flex: 0 0 var(--dbc-rail-width) !important;
-  background: #111214 !important;
   overflow-y: auto !important;
   overflow-x: hidden !important;
   -webkit-overflow-scrolling: touch;
@@ -342,7 +595,7 @@ body.dbc-mobile-active.dbc-mode-nav section[class*="panels_"] {
 }
 
 /* ============================================================================
- * 3. MOBILE CHAT MODE (Fullscreen Active Channel Messages)
+ * 3. MOBILE CHAT MODE (No Clipping, Crisp 40x40 Avatars, Clean Header & Composer)
  * ============================================================================ */
 body.dbc-mobile-active.dbc-mode-chat [data-dbc-guilds-rail="1"],
 body.dbc-mobile-active.dbc-mode-chat [data-dbc-chan-pane="1"],
@@ -365,29 +618,91 @@ body.dbc-mobile-active.dbc-mode-chat main {
   background: #1e1f22 !important;
   position: relative !important;
   padding-top: var(--dbc-safe-top) !important;
-  padding-bottom: var(--dbc-safe-bottom) !important;
+  padding-bottom: 0 !important;
   box-sizing: border-box !important;
 }
 
-body.dbc-mobile-active.dbc-keyboard-open.dbc-mode-chat [data-dbc-content="1"],
-body.dbc-mobile-active.dbc-keyboard-open.dbc-mode-chat [class*="chat_"],
-body.dbc-mobile-active.dbc-keyboard-open.dbc-mode-chat main {
-  padding-bottom: 0px !important;
+body.dbc-mobile-active.dbc-mode-chat [class*="chatContent_"] {
+  padding-top: 0 !important;
+  flex: 1 1 auto !important;
+  min-height: 0 !important;
+  width: 100% !important;
+  max-width: 100% !important;
+  display: flex !important;
+  flex-direction: column !important;
+}
+
+body.dbc-mobile-active.dbc-mode-chat [class*="messagesWrapper_"] {
+  flex: 1 1 auto !important;
+  min-height: 0 !important;
+}
+
+/* Crisp circular 40x40 avatars (never squished on narrow screens) */
+body.dbc-mobile-active img[class*="avatar_"],
+body.dbc-mobile-active [class*="avatar_"] img {
+  width: 40px !important;
+  height: 40px !important;
+  min-width: 40px !important;
+  max-width: 40px !important;
+  border-radius: 50% !important;
+  object-fit: cover !important;
+}
+
+body.dbc-mobile-active [class*="repliedMessage_"] img[class*="avatar_"],
+body.dbc-mobile-active [class*="replyAvatar_"] {
+  width: 16px !important;
+  height: 16px !important;
+  min-width: 16px !important;
+  max-width: 16px !important;
+}
+
+/* Generous composer bottom safe-area inset */
+body.dbc-mobile-active.dbc-mode-chat [class*="channelBottomBarArea_"],
+body.dbc-mobile-active.dbc-mode-chat main form[class*="form_"] {
+  padding-left: 8px !important;
+  padding-right: 8px !important;
+  padding-bottom: max(6px, var(--dbc-safe-bottom)) !important;
+  margin-bottom: 0 !important;
+}
+
+body.dbc-mobile-active.dbc-keyboard-open.dbc-mode-chat [class*="channelBottomBarArea_"],
+body.dbc-mobile-active.dbc-keyboard-open.dbc-mode-chat main form[class*="form_"] {
+  padding-bottom: 4px !important;
 }
 
 body.dbc-mobile-active.dbc-mode-chat [data-dbc-header-bar="1"],
 body.dbc-mobile-active.dbc-mode-chat section[class*="title_"],
 body.dbc-mobile-active.dbc-mode-chat [class*="chat_"] > section[class*="container_"] {
   padding-left: 52px !important;
+  padding-right: 8px !important;
   min-height: 48px !important;
   height: 48px !important;
+  flex-shrink: 0 !important;
+}
+
+/* Hide desktop header clutter on < 600px screens so channel name & Member button fit cleanly */
+@media (max-width: 600px) {
+  body.dbc-mobile-active [data-dbc-header-bar="1"] [class*="search_"],
+  body.dbc-mobile-active [data-dbc-header-bar="1"] [class*="searchBar_"],
+  body.dbc-mobile-active [data-dbc-header-bar="1"] [aria-label*="Threads" i],
+  body.dbc-mobile-active [data-dbc-header-bar="1"] [aria-label*="Chủ đề" i],
+  body.dbc-mobile-active [data-dbc-header-bar="1"] [aria-label*="Notification" i],
+  body.dbc-mobile-active [data-dbc-header-bar="1"] [aria-label*="Thông báo" i],
+  body.dbc-mobile-active [data-dbc-header-bar="1"] [aria-label*="Pinned" i],
+  body.dbc-mobile-active [data-dbc-header-bar="1"] [aria-label*="Đã ghim" i],
+  body.dbc-mobile-active [data-dbc-header-bar="1"] [aria-label*="Help" i],
+  body.dbc-mobile-active [data-dbc-header-bar="1"] [aria-label*="Trợ giúp" i],
+  body.dbc-mobile-active [aria-label*="Gift" i],
+  body.dbc-mobile-active [aria-label*="Tặng" i] {
+    display: none !important;
+  }
 }
 
 #dbc-mobile-back-btn {
   display: none;
 }
 
-body.dbc-mobile-active.dbc-mode-chat:not(.dbc-page-login) #dbc-mobile-back-btn {
+body.dbc-mobile-active.dbc-mode-chat:not(.dbc-page-login):not(.dbc-settings-open) #dbc-mobile-back-btn {
   display: flex !important;
   position: fixed !important;
   top: calc(6px + var(--dbc-safe-top)) !important;
@@ -422,7 +737,7 @@ body.dbc-mobile-active.dbc-mode-chat #dbc-mobile-back-btn:active {
   display: none;
 }
 
-body.dbc-mobile-active.dbc-mode-nav:not(.dbc-keyboard-open):not(.dbc-page-login) #dbc-profile-strip {
+body.dbc-mobile-active.dbc-mode-nav:not(.dbc-keyboard-open):not(.dbc-page-login):not(.dbc-settings-open) #dbc-profile-strip {
   display: flex !important;
   position: fixed !important;
   bottom: 0 !important;
@@ -490,7 +805,7 @@ body.dbc-mobile-active.dbc-mode-nav:not(.dbc-keyboard-open):not(.dbc-page-login)
 .dbc-profile-actions {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 6px;
   flex-shrink: 0;
 }
 
@@ -580,7 +895,7 @@ body.dbc-mobile-active.dbc-keyboard-open [class*="autocomplete_"] {
 }
 
 /* ============================================================================
- * 7. MOBILE MODALS, EMBED BUILDER, POPOUTS, MENUS & SETTINGS DRILL-DOWN
+ * 7. MOBILE MODALS, POPOUTS & 1-COLUMN SETTINGS DRILL-DOWN
  * ============================================================================ */
 body.dbc-mobile-active [class*="modal_"],
 body.dbc-mobile-active [class*="root_"][role="dialog"] {
@@ -601,39 +916,77 @@ body.dbc-mobile-active [class*="userPopoutOuter_"] {
   -webkit-overflow-scrolling: touch;
 }
 
-/* Settings Drill-Down on Mobile */
-body.dbc-mobile-active [class*="standardSidebarView_"] {
-  padding-top: var(--dbc-safe-top) !important;
-}
-
-body.dbc-mobile-active:not(.dbc-settings-content-focused) [class*="standardSidebarView_"] [class*="sidebarRegion_"] {
+/* Settings Drill-Down on Mobile (supports both standardSidebarView_ & newer settings layers) */
+body.dbc-mobile-active.dbc-settings-open [data-dbc-settings-root="1"],
+body.dbc-mobile-active.dbc-settings-open [class*="standardSidebarView_"] {
+  position: fixed !important;
+  inset: 0 !important;
   width: 100vw !important;
   max-width: 100vw !important;
-  flex: 1 1 100vw !important;
-}
-
-body.dbc-mobile-active:not(.dbc-settings-content-focused) [class*="standardSidebarView_"] [class*="contentRegion_"] {
-  display: none !important;
-}
-
-body.dbc-mobile-active.dbc-settings-content-focused [class*="standardSidebarView_"] [class*="sidebarRegion_"] {
-  display: none !important;
-}
-
-body.dbc-mobile-active.dbc-settings-content-focused [class*="standardSidebarView_"] [class*="contentRegion_"] {
+  height: var(--dbc-vvh, 100dvh) !important;
+  z-index: 100020 !important;
+  background: #1e1f22 !important;
   display: flex !important;
-  width: 100vw !important;
-  max-width: 100vw !important;
-  padding-top: 48px !important;
+  flex-direction: column !important;
+  overflow: hidden !important;
 }
 
-body.dbc-mobile-active.dbc-settings-content-focused #dbc-settings-back-btn {
+body.dbc-mobile-active.dbc-settings-open:not(.dbc-settings-content-focused) [data-dbc-settings-nav="1"],
+body.dbc-mobile-active.dbc-settings-open:not(.dbc-settings-content-focused) [class*="standardSidebarView_"] [class*="sidebarRegion_"] {
+  display: flex !important;
+  flex-direction: column !important;
+  width: 100vw !important;
+  max-width: 100vw !important;
+  min-width: 100vw !important;
+  height: 100% !important;
+  flex: 1 1 100% !important;
+  padding: calc(52px + var(--dbc-safe-top)) 12px max(24px, var(--dbc-safe-bottom)) 12px !important;
+  overflow-y: auto !important;
+  overflow-x: hidden !important;
+  box-sizing: border-box !important;
+}
+
+body.dbc-mobile-active.dbc-settings-open:not(.dbc-settings-content-focused) [data-dbc-settings-content="1"],
+body.dbc-mobile-active.dbc-settings-open:not(.dbc-settings-content-focused) [class*="standardSidebarView_"] [class*="contentRegion_"] {
+  display: none !important;
+}
+
+body.dbc-mobile-active.dbc-settings-open.dbc-settings-content-focused [data-dbc-settings-nav="1"],
+body.dbc-mobile-active.dbc-settings-open.dbc-settings-content-focused [class*="standardSidebarView_"] [class*="sidebarRegion_"] {
+  display: none !important;
+}
+
+body.dbc-mobile-active.dbc-settings-open.dbc-settings-content-focused [data-dbc-settings-content="1"],
+body.dbc-mobile-active.dbc-settings-open.dbc-settings-content-focused [class*="standardSidebarView_"] [class*="contentRegion_"] {
+  display: flex !important;
+  flex-direction: column !important;
+  width: 100vw !important;
+  max-width: 100vw !important;
+  min-width: 100vw !important;
+  height: 100% !important;
+  flex: 1 1 100% !important;
+  padding: calc(52px + var(--dbc-safe-top)) 14px max(24px, var(--dbc-safe-bottom)) 14px !important;
+  overflow-y: auto !important;
+  overflow-x: hidden !important;
+  box-sizing: border-box !important;
+}
+
+body.dbc-mobile-active.dbc-settings-open [data-dbc-settings-content="1"] [class*="contentColumn_"],
+body.dbc-mobile-active.dbc-settings-open [class*="standardSidebarView_"] [class*="contentColumn_"] {
+  width: 100% !important;
+  min-width: 0 !important;
+  max-width: 100% !important;
+  padding: 0 !important;
+}
+
+body.dbc-mobile-active.dbc-settings-open.dbc-settings-content-focused #dbc-settings-back-btn {
   display: inline-flex !important;
   align-items: center;
+  gap: 6px;
   position: fixed !important;
   top: calc(8px + var(--dbc-safe-top)) !important;
   left: 12px !important;
-  z-index: 100050 !important;
+  z-index: 100060 !important;
   background: #2b2d31 !important;
   color: #f2f3f5 !important;
   border: 1px solid rgba(255, 255, 255, 0.14) !important;
@@ -641,5 +994,22 @@ body.dbc-mobile-active.dbc-settings-content-focused #dbc-settings-back-btn {
   padding: 6px 14px !important;
   font-size: 13px !important;
   font-weight: 600 !important;
+  cursor: pointer !important;
+}
+
+body.dbc-mobile-active.dbc-settings-open #dbc-settings-close-btn {
+  display: inline-flex !important;
+  align-items: center;
+  justify-content: center;
+  position: fixed !important;
+  top: calc(8px + var(--dbc-safe-top)) !important;
+  right: 12px !important;
+  width: 34px !important;
+  height: 34px !important;
+  z-index: 100060 !important;
+  background: #2b2d31 !important;
+  color: #f2f3f5 !important;
+  border: 1px solid rgba(255, 255, 255, 0.14) !important;
+  border-radius: 50% !important;
   cursor: pointer !important;
 }

@@ -2,7 +2,7 @@
  * DiscordBotClient Web Bridge (Replaces ElectronPreload.ts & Chrome Extension Content Script)
  * Provides window.BotClientNative, window.protoAPI, Vencord CSS injection,
  * Discohook MessageChannel bridge, Storage preservation, Desktop UA spoofing for Discord React,
- * Bot Guild Member @mention Hydrator, and Native Discord Mobile App UI Controller.
+ * Bot Guild Member @mention Hydrator, On-Device Multi-Bot Vault, and Mobile UI Controller.
  */
 (function () {
   // 0. Capture window.localStorage & window.sessionStorage IMMEDIATELY in <head>
@@ -41,21 +41,68 @@
     } catch (e) {}
   }
 
-  function getStoredBotToken() {
-    var raw = safeGetLocal("token") || "";
-    if (!raw) return "";
-    try {
-      if (raw.charAt(0) === '"') raw = JSON.parse(raw);
-    } catch (e) {}
-    return String(raw || "")
+  function cleanTokenString(val) {
+    return String(val || "")
       .trim()
       .replace(/^["']|["']$/g, "")
       .replace(/^Bot\s+/i, "")
       .trim();
   }
 
-  // Spoof Desktop UA so Discord serves its full React app instead of the static "Download Discord App" blocker,
-  // while our Mobile App Controller + CSS transforms the React DOM into a true Mobile App UI on phones!
+  function getStoredBotToken() {
+    var raw = safeGetLocal("token") || "";
+    if (!raw) return "";
+    try {
+      if (raw.charAt(0) === '"') raw = JSON.parse(raw);
+    } catch (e) {}
+    return cleanTokenString(raw);
+  }
+
+  // On-device Bot Vault (`localStorage.__dbc_saved_bots__`)
+  var BOT_VAULT_KEY = "__dbc_saved_bots__";
+  function loadBotVault() {
+    try {
+      var raw = safeGetLocal(BOT_VAULT_KEY);
+      if (!raw) return [];
+      var parsed = JSON.parse(raw);
+      return Array.isArray(parsed) ? parsed : [];
+    } catch (e) {
+      return [];
+    }
+  }
+  function saveBotVault(list) {
+    try {
+      safeSetLocal(BOT_VAULT_KEY, JSON.stringify(list));
+    } catch (e) {}
+  }
+  function upsertSavedBot(entry) {
+    if (!entry || !entry.token) return;
+    var tok = cleanTokenString(entry.token);
+    if (!tok) return;
+    var list = loadBotVault().filter(function (item) {
+      if (!item || !item.token) return false;
+      if (entry.id && item.id && item.id === entry.id) return false;
+      return cleanTokenString(item.token) !== tok;
+    });
+    list.unshift({
+      id: entry.id || "",
+      username: entry.username || "Discord Bot",
+      avatar: entry.avatar || "",
+      token: tok,
+      updatedAt: Date.now(),
+    });
+    if (list.length > 25) list = list.slice(0, 25);
+    saveBotVault(list);
+  }
+  function removeSavedBot(token) {
+    var tok = cleanTokenString(token);
+    var list = loadBotVault().filter(function (item) {
+      return item && cleanTokenString(item.token) !== tok;
+    });
+    saveBotVault(list);
+  }
+
+  // Spoof Desktop UA so Discord serves its full React app instead of the static "Download Discord App" blocker
   var origUserAgent = "";
   var isRealMobileDevice = false;
   try {
@@ -77,7 +124,6 @@
     }
   } catch (e) {}
 
-  // Ensure window.Notification stub exists on iOS Safari browser tabs so plugins checking Notification.permission never throw
   if (typeof window.Notification === "undefined") {
     window.Notification = function () {};
     window.Notification.permission = "denied";
@@ -86,7 +132,6 @@
     };
   }
 
-  // Stub navigator.mediaDevices (missing in some iOS WebViews / insecure contexts) so Vencord's webScreenShare plugin never crashes the bundle
   try {
     if (!navigator.mediaDevices) {
       Object.defineProperty(navigator, "mediaDevices", { value: {}, configurable: true });
@@ -105,7 +150,6 @@
     }
   } catch (e) {}
 
-  // Unregister any leftover service workers from older builds
   if ("serviceWorker" in navigator) {
     navigator.serviceWorker.getRegistrations().then(function (regs) {
       regs.forEach(function (reg) {
@@ -130,9 +174,15 @@
     apexExperiments: { evaluation_id: "dbc", assignments: [] },
   };
 
-  // Rewrite hardcoded discord.com/api requests in Discord's RestAPI to current APIServer origin
+  // Rewrite hardcoded discord.com/api requests & upgrade http:// CDN/media URLs to https://
   function normalizeLocalEndpointUrl(url) {
     if (typeof url !== "string") return url;
+    if (url.indexOf("http://cdn.discordapp.com/") === 0 || url.indexOf("http://media.discordapp.net/") === 0) {
+      return "https://" + url.slice(7);
+    }
+    if (url.indexOf("http://images-ext-1.discordapp.net/") === 0 || url.indexOf("http://images-ext-2.discordapp.net/") === 0) {
+      return "https://" + url.slice(7);
+    }
     var wrongOrigin = "https://" + window.location.host;
     if (window.location.protocol === "http:" && url.indexOf(wrongOrigin) === 0) {
       return "http://" + window.location.host + url.slice(wrongOrigin.length);
@@ -173,6 +223,38 @@
     };
   }
 
+  // Upgrade http:// media/CDN <img> src and suppress broken [?] Safari placeholders on badges/role-icons
+  function sanitizeImagesInDom() {
+    var imgs = document.querySelectorAll('img[src^="http://cdn.discordapp.com/"], img[src^="http://media.discordapp.net/"], img[src^="http://images-ext-"]');
+    for (var i = 0; i < imgs.length; i++) {
+      var src = imgs[i].getAttribute("src");
+      if (src) imgs[i].setAttribute("src", "https://" + src.slice(7));
+    }
+  }
+
+  document.addEventListener(
+    "error",
+    function (e) {
+      var img = e.target;
+      if (!img || img.tagName !== "IMG") return;
+      var src = img.getAttribute("src") || "";
+      if (src.indexOf("http://") === 0 && (src.indexOf("discordapp.com") !== -1 || src.indexOf("discordapp.net") !== -1)) {
+        img.setAttribute("src", "https://" + src.slice(7));
+        return;
+      }
+      var isBadgeOrRole =
+        src.indexOf("/badge-icons/") !== -1 ||
+        src.indexOf("/role-icons/") !== -1 ||
+        src.indexOf("/clan-badges/") !== -1 ||
+        img.matches('img[class*="badge_"], img[class*="clan"], img[class*="roleIcon"], img[class*="botTag"] img');
+      if (isBadgeOrRole) {
+        img.setAttribute("data-dbc-hidden-broken-badge", "1");
+        img.style.display = "none";
+      }
+    },
+    true
+  );
+
   var cachedBotMeta = null;
   try {
     var savedMeta = safeGetSession("__dbc_bot_meta__");
@@ -198,7 +280,7 @@
           }
           if (pkt && pkt.op === 2 && pkt.d && pkt.d.intents === undefined) {
             if (typeof pkt.d.token === "string") {
-              pkt.d.token = pkt.d.token.replace(/^["']|["']$/g, "").replace(/^Bot\s+/i, "").trim();
+              pkt.d.token = cleanTokenString(pkt.d.token);
             }
             var wsRef = this;
             var tok = pkt.d.token;
@@ -233,12 +315,23 @@
   window.BotClientNative = {
     getBotInfo: async function (token) {
       try {
+        var cleaned = cleanTokenString(token);
         var res = await origFetch.call(window, "/dbc-bridge/get-bot-info", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ token: token }),
+          body: JSON.stringify({ token: cleaned }),
         });
-        return await res.json();
+        var json = await res.json();
+        if (json && json.success && json.data) {
+          var botUser = json.data.bot || json.data;
+          upsertSavedBot({
+            id: botUser.id || json.data.id || "",
+            username: botUser.username || json.data.name || "Discord Bot",
+            avatar: botUser.avatar || json.data.icon || "",
+            token: cleaned,
+          });
+        }
+        return json;
       } catch (err) {
         return {
           success: false,
@@ -384,6 +477,191 @@
       closeDiscohookModal();
     }
   });
+
+  // ============================================================================
+  // 4a. ON-DEVICE MULTI-BOT ACCOUNT SWITCHER MODAL (100% Inline SVG)
+  // ============================================================================
+  var vaultModal = null;
+
+  function escHtml(s) {
+    return String(s || "").replace(/[&<>"']/g, function (m) {
+      return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[m];
+    });
+  }
+
+  function activateBotToken(rawToken, meta) {
+    var cleaned = cleanTokenString(rawToken);
+    if (!cleaned) return;
+    safeSetSession("currentShard", "0");
+    safeSetLocal("token", JSON.stringify(cleaned));
+    if (meta && meta.success) {
+      cachedBotMeta = meta;
+      safeSetSession("__dbc_bot_meta__", JSON.stringify(meta));
+      safeSetSession("allShards", String(meta.allShards || 1));
+    }
+    try {
+      if (window.Vencord && window.Vencord.Webpack) {
+        var LoginMod = window.Vencord.Webpack.findByProps("loginToken", "login");
+        if (LoginMod && typeof LoginMod.loginToken === "function") {
+          LoginMod.loginToken(cleaned);
+        }
+      }
+    } catch (e) {}
+    setTimeout(function () {
+      window.location.href = "/channels/@me";
+    }, 350);
+  }
+
+  function ensureVaultModal() {
+    if (vaultModal) return;
+    vaultModal = document.createElement("div");
+    vaultModal.id = "dbc-bot-vault-modal";
+    vaultModal.className = "dbc-hidden";
+    vaultModal.addEventListener("click", function (e) {
+      if (e.target === vaultModal) closeBotVaultModal();
+    });
+    document.body.appendChild(vaultModal);
+  }
+
+  function renderVaultModal() {
+    ensureVaultModal();
+    var bots = loadBotVault();
+    var activeTok = getStoredBotToken();
+
+    // Also include current logged-in bot if not yet in vault
+    if (activeTok && !bots.some(function (b) { return cleanTokenString(b.token) === activeTok; })) {
+      var curUser = null;
+      try {
+        if (window.Vencord && window.Vencord.Webpack && window.Vencord.Webpack.Common && window.Vencord.Webpack.Common.UserStore) {
+          curUser = window.Vencord.Webpack.Common.UserStore.getCurrentUser();
+        }
+      } catch (e) {}
+      upsertSavedBot({
+        id: curUser ? curUser.id : "",
+        username: curUser ? (curUser.globalName || curUser.username) : "Bot hiện tại",
+        avatar: curUser ? (curUser.avatar || "") : "",
+        token: activeTok,
+      });
+      bots = loadBotVault();
+    }
+
+    var listHtml = bots.length
+      ? bots
+          .map(function (b, idx) {
+            var isCur = activeTok && cleanTokenString(b.token) === activeTok;
+            var avatarUrl = b.avatar && b.id
+              ? "https://cdn.discordapp.com/avatars/" + escHtml(b.id) + "/" + escHtml(b.avatar) + ".png?size=64"
+              : "https://cdn.discordapp.com/embed/avatars/0.png";
+            return (
+              '<div class="dbc-vault-item ' + (isCur ? "active" : "") + '">' +
+              '  <img class="dbc-vault-avatar" src="' + avatarUrl + '" alt=""/>' +
+              '  <div class="dbc-vault-meta">' +
+              '    <div class="dbc-vault-name">' + escHtml(b.username || "Bot") + "</div>" +
+              '    <div class="dbc-vault-id">' + (b.id ? "ID: " + escHtml(b.id) : "Đã lưu cục bộ") + "</div>" +
+              "  </div>" +
+              '  <div class="dbc-vault-actions">' +
+              (isCur
+                ? '<span style="font-size:11px;font-weight:700;color:#30d158;padding:4px 8px">Đang dùng</span>'
+                : '<button type="button" class="dbc-vault-btn" data-vault-use="' + idx + '">Chuyển</button>') +
+              '    <button type="button" class="dbc-vault-del" data-vault-del="' + idx + '" title="Xoá">' +
+              '      <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/></svg>' +
+              "    </button>" +
+              "  </div>" +
+              "</div>"
+            );
+          })
+          .join("")
+      : '<div style="font-size:13px;color:#949ba4;text-align:center;padding:10px 0">Chưa có Bot nào được lưu trên thiết bị này.</div>';
+
+    vaultModal.innerHTML =
+      '<div class="dbc-vault-card">' +
+      '  <div class="dbc-vault-header">' +
+      '    <span style="display:inline-flex;align-items:center;gap:8px">' +
+      '      <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="10" rx="2"/><circle cx="12" cy="5" r="2"/><path d="M12 7v4"/></svg>' +
+      "      <span>Tài khoản Bot</span>" +
+      "    </span>" +
+      '    <button type="button" class="dbc-vault-close" id="dbc-vault-close-btn" aria-label="Đóng">' +
+      '      <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>' +
+      "    </button>" +
+      "  </div>" +
+      '  <div class="dbc-vault-body">' +
+      '    <div class="dbc-vault-note">' +
+      '      <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="#5865f2" stroke-width="2" style="flex-shrink:0"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>' +
+      "      <span>Token chỉ lưu cục bộ trên máy, chỉ gửi tới Discord API.</span>" +
+      "    </div>" +
+      '    <div class="dbc-vault-list">' + listHtml + "</div>" +
+      '    <div class="dbc-vault-add">' +
+      '      <input type="password" id="dbc-vault-token-input" class="dbc-vault-input" placeholder="Dán Bot Token mới để thêm..." autocomplete="off" autocapitalize="off" spellcheck="false" />' +
+      '      <div id="dbc-vault-err" class="dbc-vault-err dbc-hidden"></div>' +
+      '      <button type="button" id="dbc-vault-add-btn" class="dbc-vault-add-btn">' +
+      '        <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2.2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>' +
+      "        <span>Thêm &amp; Đăng nhập Bot</span>" +
+      "      </button>" +
+      "    </div>" +
+      "  </div>" +
+      "</div>";
+
+    document.getElementById("dbc-vault-close-btn").onclick = closeBotVaultModal;
+
+    var useBtns = vaultModal.querySelectorAll("[data-vault-use]");
+    for (var i = 0; i < useBtns.length; i++) {
+      (function (btn) {
+        btn.onclick = async function () {
+          var idx = parseInt(btn.getAttribute("data-vault-use"), 10);
+          var target = bots[idx];
+          if (!target) return;
+          btn.disabled = true;
+          btn.textContent = "...";
+          var info = await window.BotClientNative.getBotInfo(target.token);
+          activateBotToken(target.token, info);
+        };
+      })(useBtns[i]);
+    }
+
+    var delBtns = vaultModal.querySelectorAll("[data-vault-del]");
+    for (var j = 0; j < delBtns.length; j++) {
+      (function (btn) {
+        btn.onclick = function () {
+          var idx = parseInt(btn.getAttribute("data-vault-del"), 10);
+          var target = bots[idx];
+          if (!target) return;
+          removeSavedBot(target.token);
+          renderVaultModal();
+        };
+      })(delBtns[j]);
+    }
+
+    document.getElementById("dbc-vault-add-btn").onclick = async function () {
+      var inp = document.getElementById("dbc-vault-token-input");
+      var err = document.getElementById("dbc-vault-err");
+      var addBtn = document.getElementById("dbc-vault-add-btn");
+      var raw = cleanTokenString(inp ? inp.value : "");
+      if (!raw || raw.split(".").length < 3) {
+        err.textContent = "Định dạng Bot Token không hợp lệ!";
+        err.classList.remove("dbc-hidden");
+        return;
+      }
+      err.classList.add("dbc-hidden");
+      addBtn.disabled = true;
+      var info = await window.BotClientNative.getBotInfo(raw);
+      if (!info || !info.success) {
+        err.textContent = (info && info.message) || "Không xác thực được Bot Token!";
+        err.classList.remove("dbc-hidden");
+        addBtn.disabled = false;
+        return;
+      }
+      activateBotToken(raw, info);
+    };
+  }
+
+  function openBotVaultModal() {
+    renderVaultModal();
+    vaultModal.classList.remove("dbc-hidden");
+  }
+
+  function closeBotVaultModal() {
+    if (vaultModal) vaultModal.classList.add("dbc-hidden");
+  }
 
   // ============================================================================
   // 4b. BOT GUILD MEMBER HYDRATOR FOR @MENTION AUTOCOMPLETE (Web & Mobile)
@@ -556,7 +834,6 @@
     }
   }
 
-  // Listen for `@query` typing inside Discord chat textbox
   document.addEventListener("input", function (e) {
     var t = e.target;
     if (!t || !(t.isContentEditable || (t.getAttribute && t.getAttribute("role") === "textbox"))) return;
@@ -572,7 +849,6 @@
     }, 250);
   });
 
-  // Prevent mobile mousedown/touchstart blur race inside @mention / #channel / /command autocomplete popup
   document.addEventListener(
     "mousedown",
     function (e) {
@@ -584,7 +860,7 @@
   );
 
   // ============================================================================
-  // 5. Discord Native Mobile App Navigation Controller & Viewport Sync
+  // 5. Discord Native Mobile App Navigation Controller & Settings Drill-Down
   // ============================================================================
   var currentMobileMode = "nav";
 
@@ -626,9 +902,66 @@
     return !!(el.offsetWidth || el.offsetHeight || el.getClientRects().length);
   }
 
+  function detectAndTagSettingsLayer() {
+    var settingsView = document.querySelector('[class*="standardSidebarView_"]');
+    var foundSettings = false;
+    if (settingsView && isVisibleElement(settingsView)) {
+      settingsView.setAttribute("data-dbc-settings-root", "1");
+      var navReg = settingsView.querySelector('[class*="sidebarRegion_"]');
+      var contReg = settingsView.querySelector('[class*="contentRegion_"]');
+      if (navReg) navReg.setAttribute("data-dbc-settings-nav", "1");
+      if (contReg) contReg.setAttribute("data-dbc-settings-content", "1");
+      foundSettings = true;
+    } else {
+      // Newer Discord Settings layer/modal with [role="tablist"]
+      var tablists = document.querySelectorAll('[class*="layer_"] [role="tablist"], [role="dialog"] [role="tablist"]');
+      for (var i = 0; i < tablists.length; i++) {
+        var tl = tablists[i];
+        if (!isVisibleElement(tl)) continue;
+        var tabs = tl.querySelectorAll('[role="tab"]');
+        if (tabs.length < 4) continue;
+        var root = tl.closest('[class*="layer_"]') || tl.closest('[role="dialog"]');
+        if (!root) continue;
+        var navBox = tl.closest('[class*="sidebar_"]') || tl.parentElement;
+        var contentBox = root.querySelector('[role="tabpanel"]') && root.querySelector('[role="tabpanel"]').parentElement;
+        if (navBox && contentBox && navBox !== contentBox) {
+          root.setAttribute("data-dbc-settings-root", "1");
+          navBox.setAttribute("data-dbc-settings-nav", "1");
+          contentBox.setAttribute("data-dbc-settings-content", "1");
+          foundSettings = true;
+          break;
+        }
+      }
+    }
+    document.body.classList.toggle("dbc-settings-open", foundSettings);
+    if (!foundSettings) {
+      document.body.classList.remove("dbc-settings-content-focused");
+    }
+  }
+
+  function closeDiscordSettings() {
+    var closeBtn = document.querySelector(
+      '[data-dbc-settings-root="1"] [class*="closeButton_"], [aria-label="Close" i][role="button"], [aria-label="Đóng" i][role="button"]'
+    );
+    if (closeBtn) {
+      closeBtn.click();
+    } else {
+      document.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", code: "Escape", keyCode: 27, bubbles: true }));
+    }
+    document.body.classList.remove("dbc-settings-open", "dbc-settings-content-focused");
+  }
+
   function updateMobileMode() {
     if (!isMobileViewport()) {
-      document.body.classList.remove("dbc-mobile-active", "dbc-mode-nav", "dbc-mode-chat", "dbc-members-open", "dbc-page-login");
+      document.body.classList.remove(
+        "dbc-mobile-active",
+        "dbc-mode-nav",
+        "dbc-mode-chat",
+        "dbc-members-open",
+        "dbc-page-login",
+        "dbc-settings-open",
+        "dbc-settings-content-focused"
+      );
       return;
     }
     document.body.classList.add("dbc-mobile-active");
@@ -642,9 +975,12 @@
     document.body.classList.toggle("dbc-page-login", isLogin);
 
     if (isLogin) {
-      document.body.classList.remove("dbc-mode-nav", "dbc-mode-chat");
+      document.body.classList.remove("dbc-mode-nav", "dbc-mode-chat", "dbc-settings-open");
+      injectLoginVaultButton();
       return;
     }
+
+    detectAndTagSettingsLayer();
 
     if (path === "/channels/@me" || path === "/app" || path === "/" || path === "") {
       setMobileMode("nav");
@@ -676,10 +1012,10 @@
   function tagDiscordMobileLayout() {
     if (!document.body) return;
 
+    sanitizeImagesInDom();
     updateMobileMode();
     checkAndHydrateCurrentChannel();
 
-    // 1. Hide Desktop Titlebars / Window Chrome immediately
     var titleBars = document.querySelectorAll(
       '[data-window-chrome="true"], [data-window-chrome], [class*="winTitleBar_"], [class*="typeWindows_"], [class*="withFrame_"]'
     );
@@ -688,7 +1024,6 @@
       titleBars[i].setAttribute("data-dbc-desktop-titlebar", "1");
     }
 
-    // 2. Identify Guilds Server Rail
     var guildsNav =
       document.querySelector('nav[class*="guilds_"]') ||
       document.querySelector('[data-list-id="guildsnav"]') ||
@@ -699,7 +1034,6 @@
       guildsNav = gEl;
     }
 
-    // 3. Identify Channels Sidebar
     var chanSidebar = document.querySelector('[class*="sidebar_"]');
     var chanListPane = document.querySelector('[class*="sidebarList_"]');
     if (chanSidebar && guildsNav && chanSidebar.contains(guildsNav)) {
@@ -720,7 +1054,6 @@
       chanSidebar.setAttribute("data-dbc-chan-pane", "1");
     }
 
-    // 4. Identify Chat area & Header Bar
     var chatArea = document.querySelector('[class*="chat_"], main');
     if (chatArea) {
       chatArea.setAttribute("data-dbc-content", "1");
@@ -733,7 +1066,6 @@
       }
     }
 
-    // 5. Right-Hand Members Sidebar Pane
     var membersList = document.querySelector('[data-list-id^="members-"], [class*="membersWrap_"]');
     if (membersList) {
       membersList.setAttribute("data-dbc-members-pane", "1");
@@ -757,10 +1089,11 @@
     var avatarUrl = "https://cdn.discordapp.com/embed/avatars/0.png";
     var username = "Bot Client";
 
-    if (meta && meta.botUser) {
-      username = meta.botUser.username || "Bot";
-      if (meta.botUser.avatar) {
-        avatarUrl = "https://cdn.discordapp.com/avatars/" + meta.botUser.id + "/" + meta.botUser.avatar + ".png?size=64";
+    if (meta && meta.data) {
+      var botU = meta.data.bot || meta.data;
+      username = botU.username || meta.data.name || "Bot";
+      if (botU.avatar && botU.id) {
+        avatarUrl = "https://cdn.discordapp.com/avatars/" + botU.id + "/" + botU.avatar + ".png?size=64";
       }
     } else {
       var foundUser = false;
@@ -799,6 +1132,7 @@
     try {
       if (window.Vencord && window.Vencord.Webpack && window.Vencord.Webpack.Common && window.Vencord.Webpack.Common.SettingsRouter) {
         window.Vencord.Webpack.Common.SettingsRouter.open("My Account");
+        setTimeout(detectAndTagSettingsLayer, 120);
         return;
       }
     } catch (e) {}
@@ -806,6 +1140,25 @@
       'button[aria-label*="Settings"], button[aria-label*="Cài đặt"], button[aria-label*="Thiết lập"]'
     );
     if (gearBtn) gearBtn.click();
+    setTimeout(detectAndTagSettingsLayer, 120);
+  }
+
+  function injectLoginVaultButton() {
+    var box = document.querySelector('[class*="authBox_"] form, [class*="authBox_"], .dbc-fallback-token-box');
+    if (!box || box.querySelector("#dbc-login-vault-btn")) return;
+    var btn = document.createElement("button");
+    btn.id = "dbc-login-vault-btn";
+    btn.type = "button";
+    btn.className = "dbc-login-vault-btn";
+    btn.innerHTML =
+      '<svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="10" rx="2"/><circle cx="12" cy="5" r="2"/><path d="M12 7v4"/></svg>' +
+      "<span>Tài khoản Bot</span>";
+    btn.addEventListener("click", function (e) {
+      e.preventDefault();
+      e.stopPropagation();
+      openBotVaultModal();
+    });
+    box.appendChild(btn);
   }
 
   function cleanupFallbackTokenBoxIfVencordMounted() {
@@ -830,7 +1183,7 @@
   function initMobileUI() {
     if (document.getElementById("dbc-mobile-back-btn")) return;
 
-    // 1. Channel Chat Header Back Button (←)
+    // 1. Channel Chat Header Back Button (SVG arrow)
     var backBtn = document.createElement("button");
     backBtn.id = "dbc-mobile-back-btn";
     backBtn.type = "button";
@@ -852,15 +1205,26 @@
     });
     document.body.appendChild(membersBackdrop);
 
-    // 3. Settings Mobile Back Button
+    // 3. Settings Mobile Back & Close Buttons (100% Inline SVG)
     var settingsBackBtn = document.createElement("button");
     settingsBackBtn.id = "dbc-settings-back-btn";
     settingsBackBtn.type = "button";
-    settingsBackBtn.textContent = "← Danh mục Cài đặt";
+    settingsBackBtn.innerHTML =
+      '<svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round"><line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/></svg>' +
+      "<span>Danh mục</span>";
     settingsBackBtn.addEventListener("click", function () {
       document.body.classList.remove("dbc-settings-content-focused");
     });
     document.body.appendChild(settingsBackBtn);
+
+    var settingsCloseBtn = document.createElement("button");
+    settingsCloseBtn.id = "dbc-settings-close-btn";
+    settingsCloseBtn.type = "button";
+    settingsCloseBtn.title = "Đóng cài đặt";
+    settingsCloseBtn.innerHTML =
+      '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>';
+    settingsCloseBtn.addEventListener("click", closeDiscordSettings);
+    document.body.appendChild(settingsCloseBtn);
 
     // 4. Discord Native Mobile Bottom Profile Bar
     var profileStrip = document.createElement("div");
@@ -870,13 +1234,17 @@
       '  <div class="dbc-profile-avatar"><img src="https://cdn.discordapp.com/embed/avatars/0.png" alt="Avatar"/></div>' +
       '  <div class="dbc-profile-info">' +
       '    <div class="dbc-profile-name">Bot Client</div>' +
-      '    <div class="dbc-profile-tag">Trực tuyến • Bot Client Web</div>' +
+      '    <div class="dbc-profile-tag">Trực tuyến</div>' +
       "  </div>" +
       "</div>" +
       '<div class="dbc-profile-actions">' +
+      '  <button type="button" class="dbc-profile-btn" id="dbc-btn-bots" title="Tài khoản Bot">' +
+      '    <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="10" rx="2"/><circle cx="12" cy="5" r="2"/><path d="M12 7v4"/></svg>' +
+      "    <span>Tài khoản Bot</span>" +
+      "  </button>" +
       '  <button type="button" class="dbc-profile-btn" id="dbc-btn-discohook" title="Mở Discohook">' +
       '    <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2l2.4 7.2L22 12l-7.6 2.8L12 22l-2.4-7.2L2 12l7.6-2.8L12 2z"/></svg>' +
-      "    <span>Discohook</span>" +
+      "    <span>Embed</span>" +
       "  </button>" +
       '  <button type="button" class="dbc-profile-btn" id="dbc-btn-settings" title="Cài đặt">' +
       '    <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>' +
@@ -884,7 +1252,11 @@
       "</div>";
 
     profileStrip.querySelector(".dbc-profile-inner").addEventListener("click", function () {
-      openUserSettingsMobile();
+      openBotVaultModal();
+    });
+    profileStrip.querySelector("#dbc-btn-bots").addEventListener("click", function (e) {
+      e.stopPropagation();
+      openBotVaultModal();
     });
     profileStrip.querySelector("#dbc-btn-discohook").addEventListener("click", function (e) {
       e.stopPropagation();
@@ -962,7 +1334,7 @@
       "touchend",
       function (e) {
         if (!isMobileViewport() || !e.changedTouches || e.changedTouches.length !== 1) return;
-        if (document.body.classList.contains("dbc-page-login")) return;
+        if (document.body.classList.contains("dbc-page-login") || document.body.classList.contains("dbc-settings-open")) return;
         var dx = e.changedTouches[0].clientX - touchStartX;
         var dy = Math.abs(e.changedTouches[0].clientY - touchStartY);
         if (dy > 60) return;
@@ -1020,7 +1392,10 @@
     // 9. Fallback Bot Token Login Injection (only if Vencord AuthBoxTokenLogin hasn't rendered)
     setInterval(function () {
       tagDiscordMobileLayout();
-      if (cleanupFallbackTokenBoxIfVencordMounted()) return;
+      if (cleanupFallbackTokenBoxIfVencordMounted()) {
+        injectLoginVaultButton();
+        return;
+      }
 
       var emailInput = document.querySelector('input[name="email"], input[autocomplete*="username"]');
       if (!emailInput) return;
@@ -1048,6 +1423,7 @@
         '<button type="button" id="dbc-fallback-token-btn" style="width:100%;padding:12px;border-radius:8px;border:none;background:#5865f2;color:#fff;font-size:15px;font-weight:600;cursor:pointer;">Đăng nhập Bot</button>';
 
       formBlock.appendChild(box);
+      injectLoginVaultButton();
 
       var inputEl = box.querySelector("#dbc-fallback-token-input");
       var errEl = box.querySelector("#dbc-fallback-token-err");
@@ -1057,11 +1433,7 @@
         ev.preventDefault();
         ev.stopPropagation();
         try {
-          var raw = (inputEl.value || "")
-            .trim()
-            .replace(/^["']|["']$/g, "")
-            .replace(/^Bot\s+/i, "")
-            .trim();
+          var raw = cleanTokenString(inputEl.value || "");
           var parts = raw.split(".");
           var isValidShape =
             (/^mfa\.[a-z0-9_-]{20,}$/i.test(raw)) ||
@@ -1075,64 +1447,16 @@
           btnEl.disabled = true;
           btnEl.textContent = "Đang đăng nhập...";
 
-          var finishLogin = function () {
-            safeSetSession("currentShard", "0");
-            safeSetLocal("token", JSON.stringify(raw));
-            btnEl.textContent = "Thành công! Đang mở Discord...";
-
-            var usedWebpack = false;
-            try {
-              if (window.Vencord && window.Vencord.Webpack) {
-                var LoginMod = window.Vencord.Webpack.findByProps("loginToken", "login");
-                if (LoginMod && typeof LoginMod.loginToken === "function") {
-                  LoginMod.loginToken(raw);
-                  usedWebpack = true;
-                }
-              }
-            } catch (e) {}
-
-            setTimeout(function () {
-              if (window.location.pathname === "/login" || !usedWebpack) {
-                window.location.href = "/channels/@me";
-              }
-            }, 600);
-          };
-
-          var watchdog = setTimeout(finishLogin, 3500);
-
-          try {
-            var ctrl = typeof AbortController !== "undefined" ? new AbortController() : null;
-            if (ctrl) {
-              setTimeout(function () {
-                ctrl.abort();
-              }, 3000);
-            }
-            var fetchRes = await origFetch.call(window, "/dbc-bridge/get-bot-info", {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({ token: raw }),
-              signal: ctrl ? ctrl.signal : undefined,
-            });
-            var checkRes = await fetchRes.json();
-            if (checkRes) {
-              if (!checkRes.success) {
-                clearTimeout(watchdog);
-                errEl.textContent = checkRes.message || "Bot Token không hợp lệ!";
-                errEl.style.display = "block";
-                btnEl.disabled = false;
-                btnEl.textContent = "Đăng nhập Bot";
-                return;
-              }
-              cachedBotMeta = checkRes;
-              safeSetSession("__dbc_bot_meta__", JSON.stringify(checkRes));
-              safeSetSession("allShards", String(checkRes.allShards || 1));
-            }
-          } catch (netErr) {
-            console.warn("get-bot-info warning:", netErr);
+          var checkRes = await window.BotClientNative.getBotInfo(raw);
+          if (checkRes && !checkRes.success) {
+            errEl.textContent = checkRes.message || "Bot Token không hợp lệ!";
+            errEl.style.display = "block";
+            btnEl.disabled = false;
+            btnEl.textContent = "Đăng nhập Bot";
+            return;
           }
-
-          clearTimeout(watchdog);
-          finishLogin();
+          btnEl.textContent = "Thành công! Đang mở Discord...";
+          activateBotToken(raw, checkRes);
         } catch (fatalErr) {
           errEl.textContent = "Lỗi: " + (fatalErr && fatalErr.message ? fatalErr.message : String(fatalErr));
           errEl.style.display = "block";

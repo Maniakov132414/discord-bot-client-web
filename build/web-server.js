@@ -252,6 +252,8 @@ function buildPatchedDiscordHTML() {
     html = html.replace('"API_ENDPOINT": "//discord.com/api"', '"API_ENDPOINT": "//" + window.location.host + "/api"');
     html = html.replace('"WEBAPP_ENDPOINT": "//discord.com"', '"WEBAPP_ENDPOINT": "//" + window.location.host');
     html = html.replace('"ASSET_ENDPOINT": "//discord.com"', '"ASSET_ENDPOINT": "//" + window.location.host');
+    html = html.replace('"MEDIA_PROXY_ENDPOINT": "//media.discordapp.net"', '"MEDIA_PROXY_ENDPOINT": "https://media.discordapp.net"');
+    html = html.replace('"IMAGE_PROXY_ENDPOINTS": "//images-ext-1.discordapp.net,//images-ext-2.discordapp.net"', '"IMAGE_PROXY_ENDPOINTS": "https://images-ext-1.discordapp.net,https://images-ext-2.discordapp.net"');
     html = html.replace('"API_PROTOCOL": "https:"', '"API_PROTOCOL": window.location.protocol');
     html = html.replace('"PRIMARY_DOMAIN": "discord.com"', '"PRIMARY_DOMAIN": window.location.host');
     html = html.replace('"MIGRATION_DESTINATION_ORIGIN": "https://discord.com"', '"MIGRATION_DESTINATION_ORIGIN": window.location.origin');
@@ -343,7 +345,14 @@ function fetchAsset(name) {
         catch {
             // fallback to network fetch
         }
-        const r = await fetch(`https://canary.discord.com/assets/${name}`);
+        let r = await fetch(`https://discord.com/assets/${name}`, {
+            headers: { "User-Agent": Constants_1.default.UserAgentDiscordBot },
+        });
+        if (!r.ok) {
+            r = await fetch(`https://canary.discord.com/assets/${name}`, {
+                headers: { "User-Agent": Constants_1.default.UserAgentDiscordBot },
+            });
+        }
         if (!r.ok)
             return null;
         const buf = Buffer.from(await r.arrayBuffer());
@@ -403,6 +412,10 @@ app.use((req, res) => {
         res.setHeader("Content-Type", "text/html; charset=utf-8");
         res.setHeader("Cache-Control", "no-store, no-cache, must-revalidate, max-age=0");
         return res.send(patchedDiscordHTML);
+    }
+    // Redirect/proxy CDN static media (badges, role icons, stickers, emojis, clan badges)
+    if (/^\/(badge-icons|role-icons|stickers|emojis|clan-badges|avatars|icons|app-icons)\//i.test(req.path)) {
+        return res.redirect(302, `https://cdn.discordapp.com${req.originalUrl}`);
     }
     // Proxy Discord JS/CSS/font assets from discord.com
     req.headers = req.originalHeaders;

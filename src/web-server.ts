@@ -254,6 +254,14 @@ function buildPatchedDiscordHTML (): string {
         '"ASSET_ENDPOINT": "//discord.com"',
         '"ASSET_ENDPOINT": "//" + window.location.host',
     );
+    html = html.replace(
+        '"MEDIA_PROXY_ENDPOINT": "//media.discordapp.net"',
+        '"MEDIA_PROXY_ENDPOINT": "https://media.discordapp.net"',
+    );
+    html = html.replace(
+        '"IMAGE_PROXY_ENDPOINTS": "//images-ext-1.discordapp.net,//images-ext-2.discordapp.net"',
+        '"IMAGE_PROXY_ENDPOINTS": "https://images-ext-1.discordapp.net,https://images-ext-2.discordapp.net"',
+    );
     html = html.replace('"API_PROTOCOL": "https:"', '"API_PROTOCOL": window.location.protocol');
     html = html.replace(
         '"PRIMARY_DOMAIN": "discord.com"',
@@ -360,7 +368,14 @@ function fetchAsset (name: string) {
         } catch {
             // fallback to network fetch
         }
-        const r = await fetch(`https://canary.discord.com/assets/${name}`);
+        let r = await fetch(`https://discord.com/assets/${name}`, {
+            headers: { "User-Agent": Constants.UserAgentDiscordBot },
+        });
+        if (!r.ok) {
+            r = await fetch(`https://canary.discord.com/assets/${name}`, {
+                headers: { "User-Agent": Constants.UserAgentDiscordBot },
+            });
+        }
         if (!r.ok) return null;
         const buf = Buffer.from(await r.arrayBuffer());
         const type = r.headers.get("content-type") || "application/octet-stream";
@@ -417,6 +432,10 @@ app.use((req, res) => {
         res.setHeader("Content-Type", "text/html; charset=utf-8");
         res.setHeader("Cache-Control", "no-store, no-cache, must-revalidate, max-age=0");
         return res.send(patchedDiscordHTML);
+    }
+    // Redirect/proxy CDN static media (badges, role icons, stickers, emojis, clan badges)
+    if (/^\/(badge-icons|role-icons|stickers|emojis|clan-badges|avatars|icons|app-icons)\//i.test(req.path)) {
+        return res.redirect(302, `https://cdn.discordapp.com${req.originalUrl}`);
     }
     // Proxy Discord JS/CSS/font assets from discord.com
     req.headers = req.originalHeaders;
