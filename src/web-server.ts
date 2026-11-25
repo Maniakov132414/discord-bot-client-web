@@ -94,6 +94,43 @@ self.addEventListener("activate", (event) => {
 `);
 });
 
+// Proxy Google Cloud Storage signed attachment uploads to bypass GCS CORS block on custom web origins
+app.put("/dbc-gcs-upload", express.raw({ type: "*/*", limit: "10mb" }), async (req, res) => {
+    try {
+        const targetUrl = typeof req.query.url === "string" ? req.query.url : "";
+        if (!/^https:\/\/discord-attachments-uploads-[a-z0-9-]+\.storage\.googleapis\.com\//i.test(targetUrl)) {
+            return res.status(400).json({ error: "Invalid GCS upload target URL" });
+        }
+        let bodyBuf: Buffer;
+        if (Buffer.isBuffer(req.body)) {
+            bodyBuf = req.body;
+        } else if (typeof req.body === "string") {
+            bodyBuf = Buffer.from(req.body, "binary");
+        } else {
+            const chunks: Buffer[] = [];
+            for await (const chunk of req) {
+                chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
+            }
+            bodyBuf = Buffer.concat(chunks);
+        }
+        const upstreamRes = await fetch(targetUrl, {
+            method: "PUT",
+            headers: {
+                "Content-Type": (req.headers["content-type"] as string) || "application/octet-stream",
+            },
+            body: new Uint8Array(bodyBuf),
+        });
+        const respBuf = Buffer.from(await upstreamRes.arrayBuffer());
+        res.status(upstreamRes.status);
+        const etag = upstreamRes.headers.get("etag");
+        if (etag) res.setHeader("ETag", etag);
+        return res.send(respBuf);
+    } catch (err: any) {
+        console.error("[dbc-gcs-upload] error:", err);
+        return res.status(502).json({ error: err?.message || "GCS upload proxy failed" });
+    }
+});
+
 // Web Bridge endpoint replacing ipcMain.handle(IPCEvent.GetBotInfo) from IPCManager.ts
 app.post("/dbc-bridge/get-bot-info", express.json(), async (req, res) => {
     try {

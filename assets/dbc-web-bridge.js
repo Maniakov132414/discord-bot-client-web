@@ -130,6 +130,9 @@
     if (url.indexOf(canaryApiHttps) === 0) {
       return window.location.origin + "/api" + url.slice(canaryApiHttps.length);
     }
+    if (/^https:\/\/discord-attachments-uploads-[a-z0-9-]+\.storage\.googleapis\.com\//i.test(url)) {
+      return window.location.origin + "/dbc-gcs-upload?url=" + encodeURIComponent(url);
+    }
     return url;
   }
 
