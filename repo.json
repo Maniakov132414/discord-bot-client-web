@@ -1,0 +1,63 @@
+{
+  "name": "DiscordBotClient Repo",
+  "identifier": "com.maniakov.discordbotclient.repo",
+  "subtitle": "100% Native SwiftUI Discord Bot Client",
+  "description": "Fast, native SwiftUI iOS Discord Bot Client (Gateway v10, REST v10, on-device multi-bot Keychain vault, zero WKWebView, no PlugIns) for ESign, Feather, SideStore, and AltStore.",
+  "sourceURL": "https://raw.githubusercontent.com/cocconne/discord-bot-client-web/main/repo.json",
+  "iconURL": "https://raw.githubusercontent.com/cocconne/discord-bot-client-web/main/assets/icon.png",
+  "headerURL": "https://raw.githubusercontent.com/cocconne/discord-bot-client-web/main/assets/icon.png",
+  "website": "https://github.com/cocconne/discord-bot-client-web",
+  "tintColor": "#5865F2",
+  "featuredApps": [
+    "com.maniakov.discordbotclient"
+  ],
+  "apps": [
+    {
+      "name": "DiscordBotClient (iOS 15+ Native)",
+      "bundleIdentifier": "com.maniakov.discordbotclient",
+      "developerName": "Maniakov",
+      "subtitle": "iOS 15+ • Pure Native SwiftUI Bot Client",
+      "localizedDescription": "Ứng dụng Discord Bot Client thuần SwiftUI (Gateway v10 & REST v10), không dùng WKWebView, hỗ trợ lưu & chuyển nhiều Bot Token 100% trên thiết bị, gửi ảnh/tệp/Embed, Purge, Mention/Channel/Emoji autocomplete và quản lý Shard/Presence.",
+      "iconURL": "https://raw.githubusercontent.com/cocconne/discord-bot-client-web/main/assets/icon.png",
+      "tintColor": "#5865F2",
+      "category": "social",
+      "type": 1,
+      "version": "2.0.0",
+      "versionDate": "2026-11-25T20:15:00+07:00",
+      "versionDescription": "v2.0.0 (Build 3): Viết lại hoàn toàn bằng SwiftUI thuần + Gateway v10 + REST v10, lưu đa Bot trên thiết bị, siêu nhẹ và tương thích hoàn hảo ESign/Feather/SideStore/AltStore.",
+      "downloadURL": "https://github.com/cocconne/discord-bot-client-web/releases/latest/download/DiscordBotClient.ipa",
+      "size": 946046,
+      "versions": [
+        {
+          "version": "2.0.0",
+          "buildVersion": "3",
+          "date": "2026-11-25",
+          "versionDate": "2026-11-25",
+          "localizedDescription": "v2.0.0 (Build 3): Pure SwiftUI native Gateway v10 + REST v10 Discord Bot Client.",
+          "versionDescription": "v2.0.0 (Build 3): Pure SwiftUI native Gateway v10 + REST v10 Discord Bot Client.",
+          "downloadURL": "https://github.com/cocconne/discord-bot-client-web/releases/latest/download/DiscordBotClient.ipa",
+          "size": 946046,
+          "minOSVersion": "15.0"
+        }
+      ],
+      "appPermissions": {
+        "entitlements": [],
+        "privacy": {
+          "NSPhotoLibraryUsageDescription": "BotClient cần quyền truy cập Thư viện ảnh để gửi ảnh và video qua Discord.",
+          "NSCameraUsageDescription": "BotClient cần quyền Camera để chụp ảnh gửi trực tiếp vào kênh Discord.",
+          "NSMicrophoneUsageDescription": "BotClient cần quyền Micro khi ghi âm hoặc quay video đính kèm."
+        }
+      }
+    }
+  ],
+  "news": [
+    {
+      "title": "DiscordBotClient iOS 2.0.0 (Pure SwiftUI)",
+      "identifier": "dbc-ios-v2-0-0",
+      "caption": "Nâng cấp lớn lên SwiftUI thuần với Gateway v10 & REST v10, hỗ trợ đa tài khoản Bot trên thiết bị, gửi ảnh/tệp/Embed và tương thích mọi chứng chỉ cài IPA.",
+      "date": "2026-11-25",
+      "tintColor": "#5865F2",
+      "notify": false
+    }
+  ]
+}

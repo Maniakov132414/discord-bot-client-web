@@ -6,6 +6,7 @@
 
 - [Installation](#installation)
     - [Windows](#windows)
+    - [iOS (.ipa)](#ios-ipa)
     - [Using prebuilt binaries](#using-prebuilt-binaries)
     - [Building from source](#building-from-source)
 - [Login](#login)
@@ -44,6 +45,17 @@ DiscordBotClient can be installed in Windows via [Winget](https://learn.microsof
 ```
 winget install aiko-chan-ai.DiscordBotClient
 ```
+
+### iOS (.ipa)
+
+Native SwiftUI iOS client (`v2.0.0`, Gateway v10 + REST v10, on-device multi-bot Keychain vault, 0 PlugIns — compatible with **ESign, Feather, SideStore, AltStore & TrollStore**):
+
+- **Direct IPA (iOS 15.0+)**: [`DiscordBotClient.ipa`](https://github.com/cocconne/discord-bot-client-web/releases/latest/download/DiscordBotClient.ipa) (`~0.90 MB`)
+- **Direct IPA (iOS 17.0+)**: [`DiscordBotClient-iOS17-NoPlug.ipa`](https://github.com/cocconne/discord-bot-client-web/releases/latest/download/DiscordBotClient-iOS17-NoPlug.ipa) (`~0.90 MB`)
+- **AltStore / SideStore / ESign / Feather Repo Source**:
+  ```
+  https://raw.githubusercontent.com/cocconne/discord-bot-client-web/main/repo.json
+  ```
 
 ### Using prebuilt binaries
 
