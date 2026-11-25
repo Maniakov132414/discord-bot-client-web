@@ -117,7 +117,7 @@ self.addEventListener("activate", (event) => {
 `);
 });
 // Proxy Google Cloud Storage signed attachment uploads to bypass GCS CORS block on custom web origins
-app.put("/dbc-gcs-upload", express_1.default.raw({ type: "*/*", limit: "10mb" }), async (req, res) => {
+app.put("/dbc-gcs-upload", express_1.default.raw({ type: "*/*", limit: "25mb" }), async (req, res) => {
     try {
         const targetUrl = typeof req.query.url === "string" ? req.query.url : "";
         if (!/^https:\/\/discord-attachments-uploads-[a-z0-9-]+\.storage\.googleapis\.com\//i.test(targetUrl)) {
@@ -399,7 +399,7 @@ app.use((req, res) => {
     if (req.originalUrl.includes("/api/"))
         return Utils_1.default.proxy(req, res);
     // Main page (disable ETag/304 caching so updated GLOBAL_ENV is always served fresh)
-    if (["/", "/app", "/login"].includes(req.path) || ["/channels/"].some(s => req.path.startsWith(s))) {
+    if (["/", "/app", "/login", "/register", "/channels"].includes(req.path) || ["/channels/", "/settings/"].some(s => req.path.startsWith(s))) {
         res.setHeader("Content-Type", "text/html; charset=utf-8");
         res.setHeader("Cache-Control", "no-store, no-cache, must-revalidate, max-age=0");
         return res.send(patchedDiscordHTML);
