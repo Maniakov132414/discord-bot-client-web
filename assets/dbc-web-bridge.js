@@ -43,9 +43,12 @@
 
   // Spoof Desktop UA so Discord serves its full React app instead of the static "Download Discord App" blocker,
   // while our Mobile App Controller + CSS transforms the React DOM into a true Mobile App UI on phones!
+  var origUserAgent = "";
+  var isRealMobileDevice = false;
   try {
-    var ua = navigator.userAgent || "";
-    if (/iPhone|iPad|iPod|Android|Mobile/i.test(ua)) {
+    origUserAgent = navigator.userAgent || "";
+    isRealMobileDevice = /iPhone|iPad|iPod|Android|Mobile/i.test(origUserAgent);
+    if (isRealMobileDevice) {
       Object.defineProperty(navigator, "userAgent", {
         get: function () {
           return "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36";
@@ -369,16 +372,15 @@
   var currentMobileMode = "nav"; // "nav" or "chat"
 
   function isMobileViewport() {
-    var isTouch = "ontouchstart" in window || navigator.maxTouchPoints > 0;
-    var isNarrow = window.innerWidth <= 1024;
-    return isTouch || isNarrow;
+    return isRealMobileDevice || window.innerWidth <= 900;
   }
 
   function updateMobileMode() {
     if (!isMobileViewport()) {
-      document.body.classList.remove("dbc-mode-nav", "dbc-mode-chat", "dbc-members-open", "dbc-page-login");
+      document.body.classList.remove("dbc-mobile-active", "dbc-mode-nav", "dbc-mode-chat", "dbc-members-open", "dbc-page-login");
       return;
     }
+    document.body.classList.add("dbc-mobile-active");
 
     var path = window.location.pathname;
     var hasToken = !!safeGetLocal("token");
