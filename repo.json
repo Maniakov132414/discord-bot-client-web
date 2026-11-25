@@ -22,12 +22,23 @@
       "tintColor": "#5865F2",
       "category": "social",
       "type": 1,
-      "version": "2.0.0",
-      "versionDate": "2026-11-25T20:15:00+07:00",
-      "versionDescription": "v2.0.0 (Build 3): Viết lại hoàn toàn bằng SwiftUI thuần + Gateway v10 + REST v10, lưu đa Bot trên thiết bị, siêu nhẹ và tương thích hoàn hảo ESign/Feather/SideStore/AltStore.",
+      "version": "2.1.0",
+      "versionDate": "2026-11-25T21:18:00+07:00",
+      "versionDescription": "v2.1.0 (Build 4): Custom & Animated Server/App Emoji, Hyperlink Emoji [name](cdn...), Bảng chọn Emoji/Sticker 1 chạm, Thành viên nhóm theo Role + Hồ sơ/Mở DM/Copy ID, Đổi Thiết bị hiển thị (Online ĐT/Desktop/Web), Components V2 (flags 32768) + Nút bấm Auto-Reply, tự nhận DM khi user nhắn trước & Thông báo Real-time.",
       "downloadURL": "https://github.com/cocconne/discord-bot-client-web/releases/latest/download/DiscordBotClient.ipa",
-      "size": 946046,
+      "size": 1302868,
       "versions": [
+        {
+          "version": "2.1.0",
+          "buildVersion": "4",
+          "date": "2026-11-25",
+          "versionDate": "2026-11-25",
+          "localizedDescription": "v2.1.0 (Build 4): Custom & Hyperlink Emojis, Role-grouped Members, Client Platform Status, Components V2 & Buttons, Auto DM Inbox & Real-time Notifications.",
+          "versionDescription": "v2.1.0 (Build 4): Custom & Hyperlink Emojis, Role-grouped Members, Client Platform Status, Components V2 & Buttons, Auto DM Inbox & Real-time Notifications.",
+          "downloadURL": "https://github.com/cocconne/discord-bot-client-web/releases/latest/download/DiscordBotClient.ipa",
+          "size": 1302868,
+          "minOSVersion": "15.0"
+        },
         {
           "version": "2.0.0",
           "buildVersion": "3",
@@ -35,7 +46,7 @@
           "versionDate": "2026-11-25",
           "localizedDescription": "v2.0.0 (Build 3): Pure SwiftUI native Gateway v10 + REST v10 Discord Bot Client.",
           "versionDescription": "v2.0.0 (Build 3): Pure SwiftUI native Gateway v10 + REST v10 Discord Bot Client.",
-          "downloadURL": "https://github.com/cocconne/discord-bot-client-web/releases/latest/download/DiscordBotClient.ipa",
+          "downloadURL": "https://github.com/cocconne/discord-bot-client-web/releases/download/v2.0.0/DiscordBotClient.ipa",
           "size": 946046,
           "minOSVersion": "15.0"
         }
@@ -51,6 +62,14 @@
     }
   ],
   "news": [
+    {
+      "title": "DiscordBotClient iOS 2.1.0 (Components V2 + Emoji + DM Alerts)",
+      "identifier": "dbc-ios-v2-1-0",
+      "caption": "Hỗ trợ Custom/Animated Emoji & Hyperlink [name](cdn...), Emoji/Sticker 1 chạm, Thành viên nhóm theo Role, Đổi thiết bị hiển thị (Online ĐT/PC/Web), Components V2 + Button Auto-Reply và Hộp thư DM + Thông báo Real-time.",
+      "date": "2026-11-25",
+      "tintColor": "#5865F2",
+      "notify": true
+    },
     {
       "title": "DiscordBotClient iOS 2.0.0 (Pure SwiftUI)",
       "identifier": "dbc-ios-v2-0-0",
