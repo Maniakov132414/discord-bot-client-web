@@ -334,7 +334,7 @@
     discohookModal.className = "dbc-hidden";
     discohookModal.innerHTML =
       '<div id="dbc-discohook-header">' +
-      "<span>✨ Discohook & Components V2 Editor</span>" +
+      '<span style="display:inline-flex;align-items:center;gap:8px"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2l2.4 7.2L22 12l-7.6 2.8L12 22l-2.4-7.2L2 12l7.6-2.8L12 2z"/></svg>Discohook &amp; Components V2 Editor</span>' +
       '<button type="button" id="dbc-discohook-close">Đóng</button>' +
       "</div>" +
       '<iframe id="dbc-discohook-iframe" src="about:blank"></iframe>';
